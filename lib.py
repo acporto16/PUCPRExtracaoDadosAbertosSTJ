@@ -87,13 +87,17 @@ def json_to_csv(data, csv_file_path):
             ordered_keys = list(data[0].keys())
             
             # Adicionar chaves que aparecem em outros registros
-            for item in data[1:]:
+            for item in data[1:0]:
                 for key in item.keys():
-                    if key not in ordered_keys:
+                    if key.strip() not in ordered_keys:
                         ordered_keys.append(key)
         
         print(f"Convertendo {len(data)} registros com {len(ordered_keys)} campos para CSV...")
         
+        # Garante que o diretório de saída exista antes de escrever o arquivo
+        output_dir = os.path.dirname(csv_file_path)
+        ensure_dir_exists(output_dir)
+
         # Escrever arquivo CSV
         with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
             writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL)
@@ -110,6 +114,8 @@ def json_to_csv(data, csv_file_path):
                     # Tratamento especial para campos de data
                     if key in ['dataPublicacao', 'dataDistribuicao', 'dataJulgamento']:
                         value = convert_timestamp_to_date(value)
+                    if key in ['recurso', 'teor', 'descricaoMonocratica']:
+                        value = removeCRLF(value)
                     # Tratamento para listas e dicionários
                     elif isinstance(value, (list, dict)):
                         value = json.dumps(value, ensure_ascii=False)
@@ -144,40 +150,53 @@ def json_to_csv(data, csv_file_path):
 
 def read_all_json_files_from_directory(directory_path):
     """
-    Lê todos os arquivos JSON de um diretório e retorna uma lista consolidada de dados.
+    Lê todos os arquivos JSON de um diretório e seus subdiretórios, e retorna uma lista consolidada de dados.
     
     :param directory_path: Caminho do diretório contendo os arquivos JSON
     :return: Lista consolidada com todos os registros de todos os arquivos JSON
     """
     all_data = []
     json_files = []
-    
+
     # Verificar se o diretório existe
     if not os.path.exists(directory_path):
         print(f"❌ Erro: Diretório não encontrado: {directory_path}")
         return None
-    
-    # Listar todos os arquivos .json no diretório
+
+    # Percorre o diretório e todos os seus subdiretórios
     try:
-        for filename in os.listdir(directory_path):
-            if filename.endswith('.json'):
-                json_files.append(filename)
-        
+        print(f"\n🔎 Procurando arquivos .json recursivamente em: {directory_path}")
+        for dirpath, _, filenames in os.walk(directory_path):
+            for filename in filenames:
+                if filename.endswith('.json'):
+                    # Adiciona o caminho completo do arquivo à lista
+                    json_files.append(os.path.join(dirpath, filename))
+
         if not json_files:
             print(f"⚠️ Nenhum arquivo JSON encontrado em: {directory_path}")
             return []
-        
-        print(f"\n📂 Encontrados {len(json_files)} arquivos JSON no diretório")
-        print(f"   Diretório: {directory_path}")
-        
+
+        print(f"\n📂 Encontrados {len(json_files)} arquivos JSON.")
+
         # Ler cada arquivo JSON
-        for filename in sorted(json_files):
-            file_path = os.path.join(directory_path, filename)
-            print(f"\n📄 Lendo arquivo: {filename}")
-            
+        for file_path in sorted(json_files):
+            # Mostra o caminho relativo para uma saída mais limpa
+            relative_path = os.path.relpath(file_path, directory_path)
+            print(f"\n📄 Lendo arquivo: {relative_path}")
+
+            def check_for_duplicate_keys(ordered_pairs):
+                """Hook para o json.load que verifica chaves duplicadas."""
+                d = {}
+                for key, value in ordered_pairs:
+                    if key in d:
+                        raise ValueError(f"Chave duplicada encontrada: '{key}'")
+                    d[key] = value
+                return d
+
             try:
                 with open(file_path, 'r', encoding='utf-8') as json_file:
-                    data = json.load(json_file)
+                    # Usa o hook para verificar chaves duplicadas durante a leitura
+                    data = json.load(json_file, object_pairs_hook=check_for_duplicate_keys)
                     
                     # Verificar se o arquivo contém uma lista ou um único objeto
                     if isinstance(data, list):
@@ -189,6 +208,8 @@ def read_all_json_files_from_directory(directory_path):
                     else:
                         print(f"   ⚠️ Formato não reconhecido (não é lista nem dicionário)")
                         
+            except ValueError as e:
+                print(f"   ❌ Erro de validação no arquivo {relative_path}: {e}")
             except json.JSONDecodeError as e:
                 print(f"   ❌ Erro ao decodificar JSON: {e}")
             except Exception as e:
@@ -490,8 +511,6 @@ def read_txt_files_and_create_csv(directory_path, csv_file_path):
                 relatorio = re.search(r'RELATÓRIO<br>(.*?)<br>VOTO<br>', content, re.DOTALL)
                 voto = re.search(r'<br>VOTO<br>(.*)', content, re.DOTALL)
                 decisao = re.search(r'DECISÃO<br>(.*)', content, re.DOTALL)
-
-                removeCRLF = lambda field:( re.sub(r'[\r\n\t]', '', field[0]) if field else '' )
 
                 acordao = removeCRLF(acordao)
                 ementa = removeCRLF(ementa)

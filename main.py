@@ -30,19 +30,19 @@ from lib import *
 #     print("Failed to extract zip files")
 #     exit()
 #
-#04
-if json_directory_to_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS):
-    print("Success !!! CSV com metadados dos acórdãos e decisões gerado com sucesso.")
-else:
-    print("Fail...")
-    exit()
-#
-# #05
-# if read_txt_files_and_create_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DECISOES_ACORDAOS):
-#     print("Success !!! CSV com os dados de acórdãos e decisões gerado com sucesso.")
+# #04
+# if json_directory_to_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS):
+#     print("Success !!! CSV com metadados dos acórdãos e decisões gerado com sucesso.")
 # else:
 #     print("Fail...")
 #     exit()
+#
+#05
+if read_txt_files_and_create_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DECISOES_ACORDAOS):
+    print("Success !!! CSV com os dados de acórdãos e decisões gerado com sucesso.")
+else:
+    print("Fail...")
+    exit()
 '''
 #06
 #clean_csv_empty_lines(DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT_DECISOES_ACORDAOS_CLEAN)
