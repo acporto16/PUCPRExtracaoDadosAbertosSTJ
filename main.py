@@ -8,7 +8,7 @@ from lib import *
     dados.
 '''
 
-'''
+
 #01
 if download_zip_files():
     print("Zip files downloaded successfully")
@@ -17,7 +17,7 @@ else:
     exit()
 
 #02
-if download_json_metadados_2025():
+if download_json_metadados():
     print("JSON files downloaded successfully")
 else:
     print("Failed to download JSON files")
@@ -36,7 +36,7 @@ if json_directory_to_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADO
 else:
     print("Fail...")
     exit()
-'''
+
 #05
 if read_txt_files_and_create_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DECISOES_ACORDAOS):
     print("Success !!! CSV com os dados de acórdãos e decisões gerado com sucesso.")

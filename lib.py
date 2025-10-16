@@ -323,7 +323,7 @@ def download_zip_files():
         print(f"Error downloading zip files: {e}")
         return False
 
-def download_json_metadados_2025():
+def download_json_metadados():
     '''
     Faz o download APENAS dos arquivos JSON de metadados de 2025 do site web do STJ.
     
@@ -339,9 +339,9 @@ def download_json_metadados_2025():
     
     # Padrão específico para identificar APENAS arquivos metadados2025MMDD.json
     # MMDD = mês (01-12) e dia (01-31)
-    #json_pattern = re.compile(r'^metadados2025(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\.json$') --> todos os meses
+    json_pattern = re.compile(r'^metadados(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\.json$')
 
-    json_pattern = re.compile(r'^metadados2025(01|03)(0[1-9]|[12]\d|3[01])\.json$') # limitado por meses
+    # json_pattern = re.compile(r'^metadados2025(01|03)(0[1-9]|[12]\d|3[01])\.json$') # limitado pelos 3 primeiros meses do ano
     
     try:
         print("Conectando ao site do STJ para buscar arquivos JSON...")
