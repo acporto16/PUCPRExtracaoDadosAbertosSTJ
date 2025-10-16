@@ -10,11 +10,11 @@ from lib import *
 
 
 #01
-# if download_zip_files():
-#     print("Zip files downloaded successfully")
-# else:
-#     print("Failed to download zip files")
-#     exit()
+if download_zip_files():
+    print("Zip files downloaded successfully")
+else:
+    print("Failed to download zip files")
+    exit()
 
 #02
 if download_json_metadados():
