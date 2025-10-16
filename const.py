@@ -11,4 +11,4 @@ DIR_PATH_DOWNLOAD_DADOS_METADADOS = os.path.join(DIR_PATH, 'arquivos', YEAR_DOWN
 DIR_PATH_OUTPUT_DADOS_METADADOS = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD, f'metadados-decisoes-acordaos-dj{YEAR_DOWNLOAD}.csv')
 DIR_PATH_OUTPUT_DECISOES_ACORDAOS = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD, f'decisoes-acordaos-dj{YEAR_DOWNLOAD}.csv')
 
-JSON_FILE_DOWNLOAD = f'metadados{YEAR_DOWNLOAD}.json'
+JSON_FILE_DOWNLOAD = f'metadados{YEAR_DOWNLOAD}'

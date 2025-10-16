@@ -305,19 +305,20 @@ def download_zip_files():
         for link in zip_links:
             filename = os.path.basename(link)
             date_match = date_pattern.search(filename)
-            for year in LIST_YEAR_DOWNLOAD:
-                if date_match and date_match.group(1).startswith(str(year)):
-                    file_path = os.path.join(ZIP_DIR_PATH, filename)
-                    if not os.path.exists(file_path):
-                        print(f"Downloading {filename}...")
-                        file_response = requests.get(link)
-                        file_response.raise_for_status()
+            year = int(YEAR_DOWNLOAD)
 
-                        with open(file_path, 'wb') as f:
-                            f.write(file_response.content)
-                        print(f"Downloaded {filename}")
-                    else:
-                        print(f"File {filename} already exists")
+            if date_match and date_match.group(1).startswith(str(year)):
+                file_path = os.path.join(ZIP_DIR_PATH, filename)
+                if not os.path.exists(file_path):
+                    print(f"Downloading {filename}...")
+                    file_response = requests.get(link)
+                    file_response.raise_for_status()
+
+                    with open(file_path, 'wb') as f:
+                        f.write(file_response.content)
+                    print(f"Downloaded {filename}")
+                else:
+                    print(f"File {filename} already exists")
         return True
 
     except Exception as e:
@@ -411,8 +412,10 @@ def download_json_metadados():
                     except json.JSONDecodeError:
                         print(f"   ❌ Arquivo baixado não é um JSON válido, removendo...")
                         os.remove(file_path)
+                        return False
                     except Exception as e:
                         print(f"   ❌ Erro ao baixar: {e}")
+                        return False
                 else:
                     print(f"⏭️  {filename} já existe, pulando download")
                     skipped_count += 1
