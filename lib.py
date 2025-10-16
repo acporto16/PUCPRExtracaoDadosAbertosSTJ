@@ -6,6 +6,7 @@ import requests
 from datetime import datetime
 import zipfile
 from const import *
+from utils import *
 
 def convert_timestamp_to_date(timestamp):
     '''
@@ -325,23 +326,24 @@ def download_zip_files():
 
 def download_json_metadados():
     '''
-    Faz o download APENAS dos arquivos JSON de metadados de 2025 do site web do STJ.
+    Faz o download APENAS dos arquivos JSON de metadados do ano especificado do site web do STJ.
     
     Regras aplicadas:
     1) Obtém somente arquivos no formato metadadosYYYYMMDD.json
-    2) Restringe apenas aos arquivos de 2025 (metadados2025MMDD.json)
+    2) Restringe apenas aos arquivos de YYYY (metadadosYYYYMMDD.json)
     3) Salva os arquivos no diretório: C:\_PUCPR\PrjDadosAbertos\arquivos
     
     :return: bool - True se o download foi bem-sucedido, False caso contrário
     '''
     url = "https://dadosabertos.web.stj.jus.br/dataset/integras-de-decisoes-terminativas-e-acordaos-do-diario-da-justica"
     download_dir = DIR_PATH_DOWNLOAD_DADOS_METADADOS
-    
-    # Padrão específico para identificar APENAS arquivos metadados2025MMDD.json
-    # MMDD = mês (01-12) e dia (01-31)
-    json_pattern = re.compile(r'^metadados2025(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\.json$')
+    ensure_dir_exists(download_dir)
 
-    # json_pattern = re.compile(r'^metadados2025(01|03)(0[1-9]|[12]\d|3[01])\.json$') # limitado pelos 3 primeiros meses do ano
+    # Padrão específico para identificar APENAS arquivos metadadosYYYYMMDD.json
+    # MMDD = mês (01-12) e dia (01-31)
+    #json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\.json$') #Geral:: todos os meses do ano
+
+    json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(01|02)(0[1-9]|[12]\d|3[01])\.json$') # limitado pelos 2 primeiros meses do ano
     
     try:
         print("Conectando ao site do STJ para buscar arquivos JSON...")
@@ -361,18 +363,18 @@ def download_json_metadados():
         
         downloaded_count = 0
         skipped_count = 0
-        found_2025_files = []
+        found_files = []
         
-        print(f"\nBuscando arquivos JSON de metadados 2025...")
+        print(f"\nBuscando arquivos JSON de metadados {YEAR_DOWNLOAD}...")
         print(f"Total de links JSON encontrados na página: {len(json_links)}")
         
         for link in json_links:
             # Extrair apenas o nome do arquivo
             filename = os.path.basename(link)
             
-            # Verificar se o arquivo corresponde ao padrão metadados2025MMDD.json
+            # Verificar se o arquivo corresponde ao padrão metadadosYYYYMMDD.json
             if json_pattern.match(filename):
-                found_2025_files.append(filename)
+                found_files.append(filename)
                 file_path = os.path.join(download_dir, filename)
                 
                 # Verificar se o arquivo já existe localmente
@@ -417,22 +419,22 @@ def download_json_metadados():
         
         # Relatório final detalhado
         print("\n" + "="*60)
-        print("📊 RELATÓRIO FINAL - Download de Metadados JSON 2025")
+        print(f"📊 RELATÓRIO FINAL - Download de Metadados JSON {YEAR_DOWNLOAD}")
         print("="*60)
         print(f"✅ Arquivos baixados com sucesso: {downloaded_count}")
         print(f"⏭️  Arquivos já existentes (pulados): {skipped_count}")
-        print(f"📁 Total de arquivos metadados 2025 encontrados: {len(found_2025_files)}")
+        print(f"📁 Total de arquivos metadados {YEAR_DOWNLOAD} encontrados: {len(found_files)}")
         print(f"📂 Diretório de destino: {download_dir}")
         
-        if found_2025_files:
-            print(f"\n📋 Arquivos de metadados 2025 encontrados:")
-            for f in sorted(found_2025_files):
+        if found_files:
+            print(f"\n📋 Arquivos de metadados {YEAR_DOWNLOAD} encontrados:")
+            for f in sorted(found_files):
                 status = "✅ Baixado" if os.path.exists(os.path.join(download_dir, f)) else "❌ Não baixado"
                 print(f"   • {f} [{status}]")
         else:
-            print("\n⚠️ ATENÇÃO: Nenhum arquivo metadados2025MMDD.json foi encontrado na página!")
+            print(f"\n⚠️ ATENÇÃO: Nenhum arquivo metadados{YEAR_DOWNLOAD}MMDD.json foi encontrado na página!")
             print("   Possíveis causas:")
-            print("   - Os arquivos ainda não foram disponibilizados para 2025")
+            print(f"   - Os arquivos ainda não foram disponibilizados para {YEAR_DOWNLOAD}")
             print("   - A URL ou estrutura do site pode ter mudado")
         
         print("="*60)
