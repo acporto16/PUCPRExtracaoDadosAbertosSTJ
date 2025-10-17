@@ -1,6 +1,6 @@
 import os
 
-YEAR_DOWNLOAD = '2024'
+YEAR_DOWNLOAD = '2023'
 
 DIR_PATH = os.path.join('C:\\', '_PUCPR', 'dados-stj')
 

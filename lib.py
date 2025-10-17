@@ -117,13 +117,15 @@ def json_to_csv(data, csv_file_path):
                     original_key = original_keys_map.get(key, key)
                     value = item.get(original_key, '')
 
-                    if key in ['seqDocumento'] and not value:
-                        raise Exception(f"SeqDocumento não foi mapeado corretamente.")
+                    if key == 'SEQDOCUMENTO' and not value:
+                        source_file = item.get('_source_file', 'desconhecido')
+                        log_event(DIR_PATH_OUTPUT, f"Registro com SEQDOCUMENTO vazio encontrado no arquivo '{source_file}'. Registro: {item}")
+                        continue # Pula para a próxima chave, mas continua processando a linha
 
                     # Tratamento especial para campos de data
-                    if key in ['dataPublicacao', 'dataDistribuicao', 'dataJulgamento']:
+                    if key in ['DATAPUBLICACAO', 'DATADISTRIBUICAO', 'DATAJULGAMENTO']:
                         value = convert_timestamp_to_date(value)
-                    if key in ['recurso', 'teor', 'descricaoMonocratica']:
+                    if key in ['RECURSO', 'TEOR', 'DESCRICAOMONOCRATICA']:
                         value = removeCRLFString(value)
                     # Tratamento para listas e dicionários
                     elif isinstance(value, (list, dict)):
@@ -210,10 +212,16 @@ def read_all_json_files_from_directory(directory_path):
 
                     # Verificar se o arquivo contém uma lista ou um único objeto
                     if isinstance(data, list):
-                        print(f"   ✅ {len(data)} registros lidos")
+                        # Adiciona o nome do arquivo de origem a cada registro
+                        for record in data:
+                            if isinstance(record, dict):
+                                record['_source_file'] = relative_path
+                        print(f"   ✅ {len(data)} registros lidos e enriquecidos")
                         all_data.extend(data)
                     elif isinstance(data, dict):
-                        print(f"   ✅ 1 registro lido")
+                        # Adiciona o nome do arquivo de origem ao registro
+                        data['_source_file'] = relative_path
+                        print(f"   ✅ 1 registro lido e enriquecido")
                         all_data.append(data)
                     else:
                         print(f"   ⚠️ Formato não reconhecido (não é lista nem dicionário)")
@@ -487,24 +495,24 @@ def download_json_metadados():
 
 def _process_txt_content(content):
     """Função auxiliar para extrair seções de um conteúdo de texto."""
-    if YEAR_DOWNLOAD != '2025':
-        acordao = re.search(r'ACÓRDÃO<br>(.*?)<br>EMENTA<br>', content, re.DOTALL)
+    if YEAR_DOWNLOAD == '2023':
+       acordao = re.search('ACÓRDÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*RELATÓRIO', content, re.DOTALL)
     else:
-        acordao = acordao = re.search('ACÓRDÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*RELATÓRIO', content, re.DOTALL)
+       acordao = re.search(r'ACÓRDÃO<br>(.*?)<br>EMENTA<br>', content, re.DOTALL)
 
     if not acordao:
         return None
 
-    if YEAR_DOWNLOAD != '2025':
+    if YEAR_DOWNLOAD == '2023':
+        ementa = re.search(r'EMENTA\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*ACÓRDÃO', content, re.DOTALL)
+        relatorio = re.search(r'RELATÓRIO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*EMENTA', content, re.DOTALL)
+        voto = re.search(r'VOTO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
+        decisao = re.search(r'DECISÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
+    else:
         ementa = re.search(r'<br>EMENTA<br>(.*?)RELATÓRIO<br>', content, re.DOTALL)
         relatorio = re.search(r'RELATÓRIO<br>(.*?)<br>VOTO<br>', content, re.DOTALL)
         voto = re.search(r'<br>VOTO<br>(.*)', content, re.DOTALL)
         decisao = re.search(r'DECISÃO<br>(.*)', content, re.DOTALL)
-    else:
-        ementa = re.search(r'EMENTA\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*VOTO', content, re.DOTALL)
-        relatorio = re.search(r'RELATÓRIO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*EMENTA', content, re.DOTALL)
-        voto = re.search(r'VOTO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
-        decisao = re.search(r'DECISÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
 
     # A função removeCRLF já está em utils.py, então podemos usá-la
     return (removeCRLF(acordao), removeCRLF(ementa), removeCRLF(relatorio),
