@@ -7,6 +7,7 @@ DIR_PATH = os.path.join('C:\\', '_PUCPR', 'dados-stj')
 ZIP_DIR_PATH = os.path.join(DIR_PATH, 'zip', YEAR_DOWNLOAD)
 UNZIP_DIR_PATH = os.path.join(DIR_PATH, 'arquivos', YEAR_DOWNLOAD)
 
+DIR_PATH_OUTPUT = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD)
 DIR_PATH_DOWNLOAD_DADOS_METADADOS = os.path.join(DIR_PATH, 'arquivos', YEAR_DOWNLOAD)
 DIR_PATH_OUTPUT_DADOS_METADADOS = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD, f'metadados-decisoes-acordaos-dj{YEAR_DOWNLOAD}.csv')
 DIR_PATH_OUTPUT_DECISOES_ACORDAOS = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD, f'decisoes-acordaos-dj{YEAR_DOWNLOAD}.csv')

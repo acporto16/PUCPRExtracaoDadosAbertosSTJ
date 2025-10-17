@@ -32,13 +32,14 @@ def main():
     # print("Arquivos zip extraídos com sucesso.")
     #
     # #04
-    # if not json_directory_to_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS):
-    #     print("Falha ao gerar o CSV de metadados.")
-    #     return
-    # print("Sucesso! CSV com metadados dos acórdãos e decisões gerado.")
+    if not json_directory_to_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS):
+        print("Falha ao gerar o CSV de metadados.")
+        return
+    print("Sucesso! CSV com metadados dos acórdãos e decisões gerado.")
 
     #05
-    if not read_txt_files_and_create_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DECISOES_ACORDAOS):
+    #if not read_txt_files_and_create_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DECISOES_ACORDAOS):
+    if not read_txt_files_and_create_csv2(DIR_PATH_OUTPUT_DADOS_METADADOS, UNZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT):
         print("Falha ao gerar o CSV com os dados dos acórdãos.")
         return
     print("Sucesso! CSV com os dados de acórdãos e decisões gerado.")

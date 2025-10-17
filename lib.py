@@ -1,12 +1,10 @@
 import json
 import csv
-import os
-import re
 import requests
-from datetime import datetime
 import zipfile
 from const import *
 from utils import *
+
 
 def convert_timestamp_to_date(timestamp):
     '''
@@ -16,14 +14,14 @@ def convert_timestamp_to_date(timestamp):
     '''
     if not timestamp:
         return ''
-    
+
     try:
         # Tentar converter assumindo milissegundos
         if isinstance(timestamp, (int, float)):
             # Se o timestamp for muito grande, provavelmente está em milissegundos
             if timestamp > 10000000000:
                 timestamp = timestamp / 1000
-            
+
             data = datetime.fromtimestamp(timestamp)
             return data.strftime('%d/%m/%Y %H:%M:%S')
         else:
@@ -31,6 +29,7 @@ def convert_timestamp_to_date(timestamp):
     except (ValueError, TypeError, OSError):
         # Se falhar, retornar como string
         return str(timestamp)
+
 
 def read_json_file(file_path):
     try:
@@ -42,6 +41,7 @@ def read_json_file(file_path):
     except json.JSONDecodeError:
         print(f"Error: Invalid JSON format in {file_path}")
         return None
+
 
 def _format_json_data(data, indent=0):
     formatted = ""
@@ -58,10 +58,11 @@ def _format_json_data(data, indent=0):
             formatted += _format_json_data(item, indent + 4)
     return formatted
 
+
 def json_to_csv(data, csv_file_path):
     '''
     Converte dados JSON (lista de dicionários) para arquivo CSV
-    
+
     :param data: Lista de dicionários com os dados
     :param csv_file_path: Caminho do arquivo CSV de saída
     :return: bool - True se sucesso, False se falha
@@ -70,11 +71,11 @@ def json_to_csv(data, csv_file_path):
     if not data:
         print("Aviso: Dados vazios fornecidos para conversão")
         return False
-    
+
     if not isinstance(data, list):
         print("Erro: Dados devem ser uma lista")
         return False
-    
+
     if not all(isinstance(item, dict) for item in data):
         print("Erro: Todos os itens devem ser dicionários")
         return False
@@ -85,15 +86,15 @@ def json_to_csv(data, csv_file_path):
         if data:
             # Preservar ordem das chaves do primeiro registro
             ordered_keys = list(data[0].keys())
-            
+
             # Adicionar chaves que aparecem em outros registros
-            # for item in data[1:0]:
-            #     for key in item.keys():
-            #         if key.strip() not in ordered_keys:
-            #             ordered_keys.append(key)
-        
+            for item in data[1:]:
+                for key in item.keys():
+                    if key.strip() not in ordered_keys:
+                        ordered_keys.append(key)
+
         print(f"Convertendo {len(data)} registros com {len(ordered_keys)} campos para CSV...")
-        
+
         # Garante que o diretório de saída exista antes de escrever o arquivo
         output_dir = os.path.dirname(csv_file_path)
         ensure_dir_exists(output_dir)
@@ -101,18 +102,18 @@ def json_to_csv(data, csv_file_path):
         # Escrever arquivo CSV
         with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
             writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL)
-            
+
             # Escrever cabeçalho
             writer.writerow(ordered_keys)
-            
+
             # Escrever linhas de dados
             for idx, item in enumerate(data, 1):
                 row = []
                 for key in ordered_keys:
                     value = item.get(key, '')
 
-                    # if key in ['seqDocumento'] and not value:
-                    #     raise Exception(f"SeqDocumento não foi mapeado corretamente.")
+                    if key in ['seqDocumento'] and not value:
+                        raise Exception(f"SeqDocumento não foi mapeado corretamente.")
 
                     # Tratamento especial para campos de data
                     if key in ['dataPublicacao', 'dataDistribuicao', 'dataJulgamento']:
@@ -127,20 +128,20 @@ def json_to_csv(data, csv_file_path):
                         value = ''
                     else:
                         value = str(value)
-                    
+
                     row.append(value)
-                
+
                 writer.writerow(row)
-                
+
                 # Mostrar progresso a cada 1000 registros
                 if idx % 1000 == 0:
                     print(f"  Processados {idx} registros...")
-        
+
         print(f"✅ CSV criado com sucesso: {csv_file_path}")
         print(f"   Total de registros: {len(data)}")
         print(f"   Total de campos: {len(ordered_keys)}")
         return True
-        
+
     except PermissionError:
         print(f"❌ Erro: Sem permissão para escrever em {csv_file_path}")
         return False
@@ -151,10 +152,11 @@ def json_to_csv(data, csv_file_path):
         print(f"❌ Erro inesperado ao converter para CSV: {e}")
         return False
 
+
 def read_all_json_files_from_directory(directory_path):
     """
     Lê todos os arquivos JSON de um diretório e seus subdiretórios, e retorna uma lista consolidada de dados.
-    
+
     :param directory_path: Caminho do diretório contendo os arquivos JSON
     :return: Lista consolidada com todos os registros de todos os arquivos JSON
     """
@@ -200,7 +202,7 @@ def read_all_json_files_from_directory(directory_path):
                 with open(file_path, 'r', encoding='utf-8') as json_file:
                     # Usa o hook para verificar chaves duplicadas durante a leitura
                     data = json.load(json_file, object_pairs_hook=check_for_duplicate_keys)
-                    
+
                     # Verificar se o arquivo contém uma lista ou um único objeto
                     if isinstance(data, list):
                         print(f"   ✅ {len(data)} registros lidos")
@@ -210,55 +212,57 @@ def read_all_json_files_from_directory(directory_path):
                         all_data.append(data)
                     else:
                         print(f"   ⚠️ Formato não reconhecido (não é lista nem dicionário)")
-                        
+
             except ValueError as e:
                 print(f"   ❌ Erro de validação no arquivo {relative_path}: {e}")
             except json.JSONDecodeError as e:
                 print(f"   ❌ Erro ao decodificar JSON: {e}")
             except Exception as e:
                 print(f"   ❌ Erro ao ler arquivo: {e}")
-        
+
         print(f"\n📊 Total de registros consolidados: {len(all_data)}")
         return all_data
-        
+
     except Exception as e:
         print(f"❌ Erro ao processar diretório: {e}")
         return None
 
+
 def json_directory_to_csv(directory_path, csv_file_path):
     """
     Lê todos os arquivos JSON de um diretório e converte para um único arquivo CSV.
-    
+
     :param directory_path: Caminho do diretório contendo os arquivos JSON
     :param csv_file_path: Caminho do arquivo CSV de saída
     :return: bool - True se sucesso, False se falha
     """
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🔄 INICIANDO CONVERSÃO DE ARQUIVOS JSON PARA CSV")
-    print("="*60)
-    
+    print("=" * 60)
+
     # Ler todos os arquivos JSON do diretório
     all_data = read_all_json_files_from_directory(directory_path)
-    
+
     if all_data is None:
         print("❌ Falha ao ler arquivos JSON")
         return False
-    
+
     if not all_data:
         print("⚠️ Nenhum dado para converter")
         return False
-    
+
     # Converter para CSV
     success = json_to_csv(all_data, csv_file_path)
-    
+
     if success:
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("✅ CONVERSÃO CONCLUÍDA COM SUCESSO!")
-        print("="*60)
+        print("=" * 60)
     else:
         print("\n❌ Falha na conversão para CSV")
-    
+
     return success
+
 
 def add_decision_column(csv_file_path):
     try:
@@ -283,6 +287,7 @@ def add_decision_column(csv_file_path):
         print(f"Error adding decision column: {e}")
         return False
 
+
 def extract_zip_files():
     '''
     Extrai todos os arquivos zip do diretório ZIP_DIR_PATH para DIR_PATH
@@ -301,6 +306,7 @@ def extract_zip_files():
     except Exception as e:
         print(f"Error extracting zip files: {e}")
         return False
+
 
 def download_zip_files():
     '''
@@ -345,15 +351,16 @@ def download_zip_files():
         print(f"Error downloading zip files: {e}")
         return False
 
+
 def download_json_metadados():
     '''
     Faz o download APENAS dos arquivos JSON de metadados do ano especificado do site web do STJ.
-    
+
     Regras aplicadas:
     1) Obtém somente arquivos no formato metadadosYYYYMMDD.json
     2) Restringe apenas aos arquivos de YYYY (metadadosYYYYMMDD.json)
     3) Salva os arquivos no diretório: C:\_PUCPR\PrjDadosAbertos\arquivos
-    
+
     :return: bool - True se o download foi bem-sucedido, False caso contrário
     '''
     url = "https://dadosabertos.web.stj.jus.br/dataset/integras-de-decisoes-terminativas-e-acordaos-do-diario-da-justica"
@@ -362,46 +369,47 @@ def download_json_metadados():
 
     # Padrão específico para identificar APENAS arquivos metadadosYYYYMMDD.json
     # MMDD = mês (01-12) e dia (01-31)
-    json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\.json$') #Geral:: todos os meses do ano
+    # json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\.json$') #Geral:: todos os meses do ano
 
-    #json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(01|02)(0[1-9]|[12]\d|3[01])\.json$') # limitado pelos 2 primeiros meses do ano
-    
+    json_pattern = re.compile(
+        f'^{JSON_FILE_DOWNLOAD}(01|02)(0[1-9]|[12]\d|3[01])\.json$')  # limitado pelos 2 primeiros meses do ano
+
     try:
         print("Conectando ao site do STJ para buscar arquivos JSON...")
         # Fazer requisição para obter a página HTML
         response = requests.get(url, timeout=30)
         response.raise_for_status()
-        
+
         # Buscar TODOS os links na página
         # Procurar por padrões de links que possam conter arquivos JSON
         all_links = re.findall(r'href="([^"]+)"', response.text)
-        
+
         # Filtrar apenas links que terminam com .json
         json_links = [link for link in all_links if link.endswith('.json')]
-        
+
         # Garantir que o diretório de destino existe
         ensure_dir_exists(download_dir)
-        
+
         downloaded_count = 0
         skipped_count = 0
         found_files = []
-        
+
         print(f"\nBuscando arquivos JSON de metadados {YEAR_DOWNLOAD}...")
         print(f"Total de links JSON encontrados na página: {len(json_links)}")
-        
+
         for link in json_links:
             # Extrair apenas o nome do arquivo
             filename = os.path.basename(link)
-            
+
             # Verificar se o arquivo corresponde ao padrão metadadosYYYYMMDD.json
             if json_pattern.match(filename):
                 found_files.append(filename)
                 file_path = os.path.join(download_dir, filename)
-                
+
                 # Verificar se o arquivo já existe localmente
                 if not os.path.exists(file_path):
                     print(f"\n📥 Baixando: {filename}")
-                    
+
                     # Construir URL completa se o link for relativo
                     if not link.startswith('http'):
                         if link.startswith('/'):
@@ -411,24 +419,24 @@ def download_json_metadados():
                             full_url = f"https://dadosabertos.web.stj.jus.br/dataset/integras-de-decisoes-terminativas-e-acordaos-do-diario-da-justica/{link}"
                     else:
                         full_url = link
-                    
+
                     try:
                         # Fazer download do arquivo JSON
                         file_response = requests.get(full_url, timeout=60)
                         file_response.raise_for_status()
-                        
+
                         # Salvar o arquivo JSON
                         with open(file_path, 'wb') as f:
                             f.write(file_response.content)
-                        
+
                         # Verificar se é um arquivo JSON válido
 
-                        with open(file_path, 'r', encoding='utf-8',) as f:
+                        with open(file_path, 'r', encoding='utf-8', ) as f:
                             json.load(f)  # Tenta carregar para validar
-                        
+
                         print(f"   ✅ Salvo em: {file_path}")
                         downloaded_count += 1
-                        
+
                     except json.JSONDecodeError:
                         print(f"   ❌ Arquivo baixado não é um JSON válido, removendo...")
                         os.remove(file_path)
@@ -439,16 +447,16 @@ def download_json_metadados():
                 else:
                     print(f"⏭️  {filename} já existe, pulando download")
                     skipped_count += 1
-        
+
         # Relatório final detalhado
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print(f"📊 RELATÓRIO FINAL - Download de Metadados JSON {YEAR_DOWNLOAD}")
-        print("="*60)
+        print("=" * 60)
         print(f"✅ Arquivos baixados com sucesso: {downloaded_count}")
         print(f"⏭️  Arquivos já existentes (pulados): {skipped_count}")
         print(f"📁 Total de arquivos metadados {YEAR_DOWNLOAD} encontrados: {len(found_files)}")
         print(f"📂 Diretório de destino: {download_dir}")
-        
+
         if found_files:
             print(f"\n📋 Arquivos de metadados {YEAR_DOWNLOAD} encontrados:")
             for f in sorted(found_files):
@@ -459,17 +467,44 @@ def download_json_metadados():
             print("   Possíveis causas:")
             print(f"   - Os arquivos ainda não foram disponibilizados para {YEAR_DOWNLOAD}")
             print("   - A URL ou estrutura do site pode ter mudado")
-        
-        print("="*60)
-        
+
+        print("=" * 60)
+
         return downloaded_count > 0 or skipped_count > 0
-        
+
     except requests.RequestException as e:
         print(f"❌ Erro ao fazer requisição HTTP: {e}")
         return False
     except Exception as e:
         print(f"❌ Erro inesperado ao baixar arquivos JSON: {e}")
         return False
+
+
+def _process_txt_content(content):
+    """Função auxiliar para extrair seções de um conteúdo de texto."""
+    if YEAR_DOWNLOAD != '2023':
+        acordao = re.search(r'ACÓRDÃO<br>(.*?)<br>EMENTA<br>', content, re.DOTALL)
+    else:
+        acordao = acordao = re.search('ACÓRDÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*RELATÓRIO', content, re.DOTALL)
+
+    if not acordao:
+        return None
+
+    if YEAR_DOWNLOAD != '2023':
+        ementa = re.search(r'<br>EMENTA<br>(.*?)RELATÓRIO<br>', content, re.DOTALL)
+        relatorio = re.search(r'RELATÓRIO<br>(.*?)<br>VOTO<br>', content, re.DOTALL)
+        voto = re.search(r'<br>VOTO<br>(.*)', content, re.DOTALL)
+        decisao = re.search(r'DECISÃO<br>(.*)', content, re.DOTALL)
+    else:
+        ementa = re.search(r'EMENTA\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*VOTO', content, re.DOTALL)
+        relatorio = re.search(r'RELATÓRIO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*EMENTA', content, re.DOTALL)
+        voto = re.search(r'VOTO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
+        decisao = re.search(r'DECISÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
+
+    # A função removeCRLF já está em utils.py, então podemos usá-la
+    return (removeCRLF(acordao), removeCRLF(ementa), removeCRLF(relatorio),
+            removeCRLF(voto), removeCRLF(decisao))
+
 
 def read_txt_files_and_create_csv(directory_path, csv_file_path):
     if not os.path.exists(directory_path):
@@ -501,42 +536,90 @@ def read_txt_files_and_create_csv(directory_path, csv_file_path):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
 
-                acordao = re.search(r'ACÓRDÃO<br>(.*?)<br>EMENTA<br>', content, re.DOTALL)
-                # Se a tag principal 'ACÓRDÃO' não for encontrada, pule para o próximo arquivo.
-                if not acordao:
+                processed_data = _process_txt_content(content)
+                if not processed_data:
                     continue
 
                 relative_path = os.path.relpath(file_path, directory_path)
                 print(f"   Processando {idx}/{total_files}: {relative_path}")
 
-                # Extrai as outras seções agora que sabemos que o arquivo é relevante
                 seqDocumento = os.path.basename(file_path).replace('.txt', '')
 
-                ementa = re.search(r'<br>EMENTA<br>(.*?)RELATÓRIO<br>', content, re.DOTALL)
-                relatorio = re.search(r'RELATÓRIO<br>(.*?)<br>VOTO<br>', content, re.DOTALL)
-                voto = re.search(r'<br>VOTO<br>(.*)', content, re.DOTALL)
-                decisao = re.search(r'DECISÃO<br>(.*)', content, re.DOTALL)
+                acordao, ementa, relatorio, voto, decisao = processed_data
+                writer.writerow([seqDocumento, acordao, ementa, relatorio, voto, decisao])
 
-                acordao = removeCRLF(acordao)
-                ementa = removeCRLF(ementa)
-                relatorio = removeCRLF(relatorio)
-                voto = removeCRLF(voto)
-                decisao = removeCRLF(decisao)
-
-                writer.writerow([
-                    seqDocumento,
-                    acordao,
-                    ementa,
-                    relatorio,
-                    voto,
-                    decisao
-                ])
             except Exception as e:
                 print(f"      ❌ Erro ao processar o arquivo {relative_path}: {e}")
                 return False
 
     print(f"✅ Processamento concluído. {total_files} arquivos processados.")
     return True
+
+
+def read_txt_files_and_create_csv2(metadata_csv_path, search_dir, output_csv_path, log_dir):
+    """
+    Cria um CSV com detalhes de acórdãos, usando um CSV de metadados como guia.
+    """
+    print("\n🔄 Iniciando processamento de TXTs guiado por metadados...")
+
+    # Etapa 1: Percorrer o arquivo de metadados CSV e obter os seqDocumento
+    print(f"   1. Lendo arquivo de metadados CSV: {metadata_csv_path}")
+    if not os.path.exists(metadata_csv_path):
+        print(f"❌ Erro: Arquivo de metadados não encontrado.")
+        return False
+
+    sequences_to_process = []
+    try:
+        with open(metadata_csv_path, 'r', encoding='utf-8') as meta_file:
+            # Usa DictReader para tratar cada linha como um dicionário
+            reader = csv.DictReader(meta_file, delimiter=';')
+
+            for row in reader:
+                # Verifica se a linha tem a chave 'tipoDocumento' e se o valor é ACORDAO
+                if 'tipoDocumento' in row and row['tipoDocumento'].upper() in ('ACÓRDÃO', 'ACORDAO'):
+                    seq = row.get('seqDocumento')
+                    if seq:
+                        sequences_to_process.append(seq)
+
+        print(f"   -> Encontrados {len(sequences_to_process)} documentos do tipo 'ACÓRDÃO'.")
+
+        # Etapa 2, 3 e 4: Buscar, processar e escrever os dados, e registrar falhas.
+        with open(output_csv_path, 'w', newline='', encoding='utf-8') as out_file:
+            writer = csv.writer(out_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL, lineterminator='\n')
+            writer.writerow(['seqDocumento', 'acordao', 'ementa', 'relatorio', 'voto', 'decisao'])
+
+            processed_count = 0
+            not_found_count = 0
+            total_to_process = len(sequences_to_process)
+
+            for idx, seq_documento in enumerate(sequences_to_process, 1):
+                filename_to_find = f"{seq_documento}.txt"
+                print(f"   Processando {idx}/{total_to_process}: Buscando {filename_to_find}...")
+
+                txt_filepath = find_file_recursively(search_dir, filename_to_find)
+
+                if txt_filepath:
+                    with open(txt_filepath, 'r', encoding='utf-8') as txt_file:
+                        content = txt_file.read()
+                        processed_data = _process_txt_content(content)
+                        if processed_data:
+                            acordao, ementa, relatorio, voto, decisao = processed_data
+                            writer.writerow([seq_documento, acordao, ementa, relatorio, voto, decisao])
+                            processed_count += 1
+                else:
+                    not_found_count += 1
+                    log_message = f"Arquivo {filename_to_find} não localizado no diretório {search_dir}"
+                    log_event(log_dir, log_message)
+
+        print("\n✅ Processamento guiado por metadados concluído.")
+        print(f"   {processed_count} arquivos TXT processados com sucesso.")
+        print(f"   {not_found_count} arquivos TXT não encontrados (verifique o log em {log_dir}).")
+        return True
+
+    except Exception as e:
+        print(f"❌ Erro inesperado ao processar o arquivo de metadados: {e}")
+        return False
+
 
 def clean_csv_empty_lines(input_csv_path, output_csv_path):
     """
@@ -550,7 +633,7 @@ def clean_csv_empty_lines(input_csv_path, output_csv_path):
     # Aumenta o limite do tamanho do campo para lidar com textos longos (voto, relatório, etc.)
     # O padrão é 131072 (128KB), o que é muito baixo para este conjunto de dados.
     # Aumentamos para um valor muito maior para evitar o erro "field larger than field limit".
-    max_int = 2147483647 # sys.maxsize para sistemas de 32 bits
+    max_int = 2147483647  # sys.maxsize para sistemas de 32 bits
     try:
         # Tenta definir o limite para o máximo possível no sistema
         csv.field_size_limit(max_int)
