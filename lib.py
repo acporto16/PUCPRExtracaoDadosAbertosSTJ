@@ -87,10 +87,10 @@ def json_to_csv(data, csv_file_path):
             ordered_keys = list(data[0].keys())
             
             # Adicionar chaves que aparecem em outros registros
-            for item in data[1:0]:
-                for key in item.keys():
-                    if key.strip() not in ordered_keys:
-                        ordered_keys.append(key)
+            # for item in data[1:0]:
+            #     for key in item.keys():
+            #         if key.strip() not in ordered_keys:
+            #             ordered_keys.append(key)
         
         print(f"Convertendo {len(data)} registros com {len(ordered_keys)} campos para CSV...")
         
@@ -110,12 +110,15 @@ def json_to_csv(data, csv_file_path):
                 row = []
                 for key in ordered_keys:
                     value = item.get(key, '')
-                    
+
+                    # if key in ['seqDocumento'] and not value:
+                    #     raise Exception(f"SeqDocumento não foi mapeado corretamente.")
+
                     # Tratamento especial para campos de data
                     if key in ['dataPublicacao', 'dataDistribuicao', 'dataJulgamento']:
                         value = convert_timestamp_to_date(value)
                     if key in ['recurso', 'teor', 'descricaoMonocratica']:
-                        value = removeCRLF(value)
+                        value = removeCRLFString(value)
                     # Tratamento para listas e dicionários
                     elif isinstance(value, (list, dict)):
                         value = json.dumps(value, ensure_ascii=False)
@@ -280,10 +283,6 @@ def add_decision_column(csv_file_path):
         print(f"Error adding decision column: {e}")
         return False
 
-def ensure_dir_exists(dir_path):
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-
 def extract_zip_files():
     '''
     Extrai todos os arquivos zip do diretório ZIP_DIR_PATH para DIR_PATH
@@ -363,9 +362,9 @@ def download_json_metadados():
 
     # Padrão específico para identificar APENAS arquivos metadadosYYYYMMDD.json
     # MMDD = mês (01-12) e dia (01-31)
-    #json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\.json$') #Geral:: todos os meses do ano
+    json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\.json$') #Geral:: todos os meses do ano
 
-    json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(01|02)(0[1-9]|[12]\d|3[01])\.json$') # limitado pelos 2 primeiros meses do ano
+    #json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(01|02)(0[1-9]|[12]\d|3[01])\.json$') # limitado pelos 2 primeiros meses do ano
     
     try:
         print("Conectando ao site do STJ para buscar arquivos JSON...")
@@ -477,23 +476,27 @@ def read_txt_files_and_create_csv(directory_path, csv_file_path):
         print(f"❌ Erro: Diretório não encontrado em {directory_path}")
         return False
 
-    txt_files = [f for f in os.listdir(directory_path) if f.endswith('.txt')]
+    txt_files = []
+    print(f"\n🔎 Procurando arquivos .txt recursivamente em: {directory_path}")
+    for dirpath, _, filenames in os.walk(directory_path):
+        for filename in filenames:
+            if filename.endswith('.txt'):
+                txt_files.append(os.path.join(dirpath, filename))
+
     total_files = len(txt_files)
 
     if total_files == 0:
         print(f"⚠️ Nenhum arquivo .txt encontrado em {directory_path}")
         return False
 
-    print(f"\n🔄 Iniciando processamento de {total_files} arquivos .txt...")
+    print(f"\n🔄 Iniciando processamento de {total_files} arquivos .txt encontrados.")
     print(f"   Salvando em: {csv_file_path}")
 
     with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL, lineterminator='\n')
         writer.writerow(['seqDocumento', 'acordao', 'ementa', 'relatorio', 'voto', 'decisao'])
 
-        for idx, txt_file in enumerate(txt_files, 1):
-
-            file_path = os.path.join(directory_path, txt_file)
+        for idx, file_path in enumerate(sorted(txt_files), 1):
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
@@ -503,9 +506,11 @@ def read_txt_files_and_create_csv(directory_path, csv_file_path):
                 if not acordao:
                     continue
 
-                print(f"   Processando {idx}/{total_files}: {txt_file}")
+                relative_path = os.path.relpath(file_path, directory_path)
+                print(f"   Processando {idx}/{total_files}: {relative_path}")
+
                 # Extrai as outras seções agora que sabemos que o arquivo é relevante
-                seqDocumento = txt_file.replace('.txt', '')
+                seqDocumento = os.path.basename(file_path).replace('.txt', '')
 
                 ementa = re.search(r'<br>EMENTA<br>(.*?)RELATÓRIO<br>', content, re.DOTALL)
                 relatorio = re.search(r'RELATÓRIO<br>(.*?)<br>VOTO<br>', content, re.DOTALL)
@@ -527,7 +532,7 @@ def read_txt_files_and_create_csv(directory_path, csv_file_path):
                     decisao
                 ])
             except Exception as e:
-                print(f"      ❌ Erro ao processar o arquivo {txt_file}: {e}")
+                print(f"      ❌ Erro ao processar o arquivo {relative_path}: {e}")
                 return False
 
     print(f"✅ Processamento concluído. {total_files} arquivos processados.")
