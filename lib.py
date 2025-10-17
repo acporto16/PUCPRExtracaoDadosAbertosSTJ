@@ -94,8 +94,8 @@ def json_to_csv(data, csv_file_path):
                 for key in item.keys():
                     normalized_key = normalize_header_key(key)
                     if normalized_key not in ordered_keys:
-                        ordered_keys.append(normalized_key)
-                        original_keys_map[normalized_key] = key
+                        ordered_keys.append(normalized_key.upper())
+                        original_keys_map[normalized_key] = key.upper()
 
         print(f"Convertendo {len(data)} registros com {len(ordered_keys)} campos para CSV...")
 
@@ -110,29 +110,39 @@ def json_to_csv(data, csv_file_path):
             # Escrever cabeçalho
             writer.writerow(ordered_keys)
 
+            list_index_seqDocumento = ['SeqDocumento', 'Seqdocumento', 'seqDocumento','SEQDOCUMENTO', 'seqdocumento']
             # Escrever linhas de dados
             for idx, item in enumerate(data, 1):
                 row = []
                 for key in ordered_keys:
                     original_key = original_keys_map.get(key, key)
                     value = item.get(original_key, '')
+                    if not value and original_key in list_index_seqDocumento:
+                        for index in list_index_seqDocumento:
+                            value = item.get(index)
+                            if value:
+                                break
 
-                    if key in ['seqDocumento'] and not value:
-                        raise Exception(f"SeqDocumento não foi mapeado corretamente.")
-
-                    # Tratamento especial para campos de data
-                    if key in ['dataPublicacao', 'dataDistribuicao', 'dataJulgamento']:
-                        value = convert_timestamp_to_date(value)
-                    if key in ['recurso', 'teor', 'descricaoMonocratica']:
-                        value = removeCRLFString(value)
-                    # Tratamento para listas e dicionários
-                    elif isinstance(value, (list, dict)):
-                        value = json.dumps(value, ensure_ascii=False)
-                    # Tratamento para None
-                    elif value is None:
-                        value = ''
-                    else:
-                        value = str(value)
+                    if not value:
+                        source_file = item.get('_source_file', 'desconhecido')
+                        log_event(DIR_PATH_OUTPUT, f"Registro com SEQDOCUMENTO vazio encontrado no arquivo '{source_file}'. Registro: {item}")
+                        continue  # Pula para a próxima chave, mas continua processando a linha
+                    try:
+                        # Tratamento especial para campos de data
+                        if key in ['DATAPUBLICACAO', 'DATADISTRIBUICAO', 'DATAJULGAMENTO', 'DATARECEBIMENTO']:
+                            value = convert_timestamp_to_date(value)
+                        if key in ['RECURSO', 'TEOR', 'DESCRICAOMONOCRATICA']:
+                            value = removeCRLFString(value)
+                        # Tratamento para listas e dicionários
+                        elif isinstance(value, (list, dict)):
+                            value = json.dumps(value, ensure_ascii=False)
+                        # Tratamento para None
+                        elif value is None:
+                            value = ''
+                        else:
+                            value = str(value)
+                    except Exception as e:
+                        raise Exception(f'Erro inesperado ao tratar campo "{key}" com valor "{value}": Detalhe do erro: "{e}".')
 
                     row.append(value)
 
@@ -315,12 +325,21 @@ def extract_zip_files():
 
 def download_zip_files():
     '''
-    Faz o download dos arquivos zip do site web do STJ.
+    Faz o download dos arquivos zip de um MÊS e ANO específicos do site web do STJ.
     Verifica se o arquivo já existe antes de fazer o download.
     Se o arquivo já existir, o download será ignorado.
     :return: bool
     '''
     url = "https://dadosabertos.web.stj.jus.br/dataset/integras-de-decisoes-terminativas-e-acordaos-do-diario-da-justica"
+
+    if MONTH_DOWNLOAD is not None:
+        # Filtra por um mês e ano específicos
+        year_month_prefix = f"{YEAR_DOWNLOAD}{str(MONTH_DOWNLOAD).zfill(2)}"
+        print(f"\n🔎 Procurando arquivos zip para o período: {str(MONTH_DOWNLOAD).zfill(2)}/{YEAR_DOWNLOAD} (prefixo: {year_month_prefix})")
+    else:
+        # Filtra por todos os meses de um ano específico
+        year_month_prefix = str(YEAR_DOWNLOAD)
+        print(f"\n🔎 Procurando arquivos zip para todos os meses de {YEAR_DOWNLOAD} (prefixo: {year_month_prefix})")
 
     date_pattern = re.compile(r'(\d{8})')
 
@@ -336,9 +355,8 @@ def download_zip_files():
         for link in zip_links:
             filename = os.path.basename(link)
             date_match = date_pattern.search(filename)
-            year = int(YEAR_DOWNLOAD)
 
-            if date_match and date_match.group(1).startswith(str(year)):
+            if date_match and date_match.group(1).startswith(year_month_prefix):
                 file_path = os.path.join(ZIP_DIR_PATH, filename)
                 if not os.path.exists(file_path):
                     print(f"Downloading {filename}...")
@@ -372,12 +390,18 @@ def download_json_metadados():
     download_dir = DIR_PATH_DOWNLOAD_DADOS_METADADOS
     ensure_dir_exists(download_dir)
 
-    # Padrão específico para identificar APENAS arquivos metadadosYYYYMMDD.json
-    # MMDD = mês (01-12) e dia (01-31)
-    # json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\.json$') #Geral:: todos os meses do ano
+    # Constrói o padrão de regex para o mês dinamicamente
+    if MONTH_DOWNLOAD is not None:
+        # Filtra por um mês específico
+        month_str = str(MONTH_DOWNLOAD).zfill(2)
+        month_pattern = month_str
+        print(f"\n🔎 Filtrando downloads de metadados para o mês: {month_str}/{YEAR_DOWNLOAD}")
+    else:
+        # Filtra por todos os meses do ano
+        month_pattern = "(0[1-9]|1[0-2])"
+        print(f"\n🔎 Filtrando downloads de metadados para todos os meses de {YEAR_DOWNLOAD}")
 
-    json_pattern = re.compile(
-        f'^{JSON_FILE_DOWNLOAD}(01|02)(0[1-9]|[12]\d|3[01])\.json$')  # limitado pelos 2 primeiros meses do ano
+    json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}{month_pattern}(0[1-9]|[12]\d|3[01])\.json$')
 
     try:
         print("Conectando ao site do STJ para buscar arquivos JSON...")
@@ -487,23 +511,31 @@ def download_json_metadados():
 
 def _process_txt_content(content):
     """Função auxiliar para extrair seções de um conteúdo de texto."""
-    if YEAR_DOWNLOAD != '2025':
-        acordao = re.search(r'ACÓRDÃO<br>(.*?)<br>EMENTA<br>', content, re.DOTALL)
+    if YEAR_DOWNLOAD == '2024':
+        acordao = re.search('ACÓRDÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*RELATÓRIO', content, re.DOTALL)
     else:
-        acordao = acordao = re.search('ACÓRDÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*RELATÓRIO', content, re.DOTALL)
+        acordao = re.search('ACÓRDÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*EMENTA', content, re.DOTALL)
+        #acordao = re.search(r'ACÓRDÃO<br>(.*?)<br>EMENTA<br>', content, re.DOTALL)
 
     if not acordao:
         return None
 
-    if YEAR_DOWNLOAD != '2025':
-        ementa = re.search(r'<br>EMENTA<br>(.*?)RELATÓRIO<br>', content, re.DOTALL)
-        relatorio = re.search(r'RELATÓRIO<br>(.*?)<br>VOTO<br>', content, re.DOTALL)
-        voto = re.search(r'<br>VOTO<br>(.*)', content, re.DOTALL)
-        decisao = re.search(r'DECISÃO<br>(.*)', content, re.DOTALL)
-    else:
+    if YEAR_DOWNLOAD == '2024':
         ementa = re.search(r'EMENTA\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*VOTO', content, re.DOTALL)
         relatorio = re.search(r'RELATÓRIO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*EMENTA', content, re.DOTALL)
         voto = re.search(r'VOTO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
+        decisao = re.search(r'DECISÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
+    else:
+        #ementa = re.search(r'<br>EMENTA<br>(.*?)RELATÓRIO<br>', content, re.DOTALL)
+        ementa = re.search(r'EMENTA\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*RELATÓRIO', content, re.DOTALL)
+
+        #relatorio = re.search(r'RELATÓRIO<br>(.*?)<br>VOTO<br>', content, re.DOTALL)
+        relatorio = re.search(r'RELATÓRIO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*VOTO', content, re.DOTALL)
+
+        #voto = re.search(r'<br>VOTO<br>(.*)', content, re.DOTALL)
+        voto = re.search(r'VOTO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
+
+        #decisao = re.search(r'DECISÃO<br>(.*)', content, re.DOTALL)
         decisao = re.search(r'DECISÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
 
     # A função removeCRLF já está em utils.py, então podemos usá-la
