@@ -85,13 +85,17 @@ def json_to_csv(data, csv_file_path):
         ordered_keys = []
         if data:
             # Preservar ordem das chaves do primeiro registro
-            ordered_keys = list(data[0].keys())
+            # Normaliza as chaves do primeiro registro
+            ordered_keys = [normalize_header_key(key) for key in data[0].keys()]
+            original_keys_map = {normalize_header_key(key): key for key in data[0].keys()}
 
             # Adicionar chaves que aparecem em outros registros
             for item in data[1:]:
                 for key in item.keys():
-                    if key.strip() not in ordered_keys:
-                        ordered_keys.append(key)
+                    normalized_key = normalize_header_key(key)
+                    if normalized_key not in ordered_keys:
+                        ordered_keys.append(normalized_key)
+                        original_keys_map[normalized_key] = key
 
         print(f"Convertendo {len(data)} registros com {len(ordered_keys)} campos para CSV...")
 
@@ -110,7 +114,8 @@ def json_to_csv(data, csv_file_path):
             for idx, item in enumerate(data, 1):
                 row = []
                 for key in ordered_keys:
-                    value = item.get(key, '')
+                    original_key = original_keys_map.get(key, key)
+                    value = item.get(original_key, '')
 
                     if key in ['seqDocumento'] and not value:
                         raise Exception(f"SeqDocumento não foi mapeado corretamente.")
@@ -482,7 +487,7 @@ def download_json_metadados():
 
 def _process_txt_content(content):
     """Função auxiliar para extrair seções de um conteúdo de texto."""
-    if YEAR_DOWNLOAD != '2023':
+    if YEAR_DOWNLOAD != '2025':
         acordao = re.search(r'ACÓRDÃO<br>(.*?)<br>EMENTA<br>', content, re.DOTALL)
     else:
         acordao = acordao = re.search('ACÓRDÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*RELATÓRIO', content, re.DOTALL)
@@ -490,7 +495,7 @@ def _process_txt_content(content):
     if not acordao:
         return None
 
-    if YEAR_DOWNLOAD != '2023':
+    if YEAR_DOWNLOAD != '2025':
         ementa = re.search(r'<br>EMENTA<br>(.*?)RELATÓRIO<br>', content, re.DOTALL)
         relatorio = re.search(r'RELATÓRIO<br>(.*?)<br>VOTO<br>', content, re.DOTALL)
         voto = re.search(r'<br>VOTO<br>(.*)', content, re.DOTALL)
@@ -575,9 +580,9 @@ def read_txt_files_and_create_csv2(metadata_csv_path, search_dir, output_csv_pat
             reader = csv.DictReader(meta_file, delimiter=';')
 
             for row in reader:
-                # Verifica se a linha tem a chave 'tipoDocumento' e se o valor é ACORDAO
-                if 'tipoDocumento' in row and row['tipoDocumento'].upper() in ('ACÓRDÃO', 'ACORDAO'):
-                    seq = row.get('seqDocumento')
+                # Verifica se a linha tem a chave 'TIPODOCUMENTO' (normalizada) e se o valor é ACORDAO
+                if 'TIPODOCUMENTO' in row and row['TIPODOCUMENTO'].upper() in ('ACÓRDÃO', 'ACORDAO'):
+                    seq = row.get('SEQDOCUMENTO')
                     if seq:
                         sequences_to_process.append(seq)
 
@@ -586,7 +591,7 @@ def read_txt_files_and_create_csv2(metadata_csv_path, search_dir, output_csv_pat
         # Etapa 2, 3 e 4: Buscar, processar e escrever os dados, e registrar falhas.
         with open(output_csv_path, 'w', newline='', encoding='utf-8') as out_file:
             writer = csv.writer(out_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL, lineterminator='\n')
-            writer.writerow(['seqDocumento', 'acordao', 'ementa', 'relatorio', 'voto', 'decisao'])
+            writer.writerow(['SEQDOCUMENTO', 'ACORDAO', 'EMENTA', 'RELATORIO', 'VOTO', 'DECISAO'])
 
             processed_count = 0
             not_found_count = 0

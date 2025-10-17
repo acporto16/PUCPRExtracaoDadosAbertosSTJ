@@ -1,6 +1,37 @@
 import os
 import re
+import unicodedata
 from datetime import datetime
+
+
+# Regex compilada para remover quebras de linha, tabs e tags <br> ou <br/>
+CLEANING_PATTERN = re.compile(r'<br/?>|[\r\n\t]')
+
+
+def normalize_header_key(key: str) -> str:
+    """
+    Normaliza uma string para ser usada como chave de cabeçalho de CSV.
+    - Converte para maiúsculas.
+    - Remove acentos.
+    - Substitui espaços e hífens por underscore.
+    - Remove todos os outros caracteres não alfanuméricos (exceto underscore).
+    """
+    if not isinstance(key, str):
+        return ''
+
+    # Remove acentos (ex: 'ACÓRDÃO' -> 'ACORDAO')
+    sem_acentos = unicodedata.normalize('NFD', key).encode('ascii', 'ignore').decode('utf-8')
+
+    # Converte para maiúsculas
+    em_maiusculo = sem_acentos.upper()
+
+    # Substitui espaços e hífens por underscore
+    com_underscore = re.sub(r'[\s-]', '_', em_maiusculo)
+
+    # Remove qualquer caractere que não seja letra, número ou underscore
+    chave_final = re.sub(r'[^A-Z0-9_]', '', com_underscore)
+
+    return chave_final
 
 
 def ensure_dir_exists(dir_path):
@@ -11,13 +42,7 @@ def ensure_dir_exists(dir_path):
 
 
 def find_file_recursively(root_dir, filename):
-    """
-    Encontra um arquivo em um diretório e seus subdiretórios.
-
-    :param root_dir: O diretório raiz para iniciar a busca.
-    :param filename: O nome do arquivo a ser encontrado.
-    :return: O caminho completo do arquivo se encontrado, caso contrário, None.
-    """
+    """Encontra um arquivo em um diretório e seus subdiretórios."""
     for dirpath, _, filenames in os.walk(root_dir):
         if filename in filenames:
             return os.path.join(dirpath, filename)
@@ -25,30 +50,19 @@ def find_file_recursively(root_dir, filename):
 
 
 def log_event(log_dir, message):
-    """
-    Registra uma mensagem com data e hora em um arquivo de log.
-
-    :param log_dir: O diretório onde o arquivo de log será salvo.
-    :param message: A mensagem a ser registrada.
-    """
+    """Registra uma mensagem com data e hora em um arquivo de log."""
     ensure_dir_exists(log_dir)
     log_file_path = os.path.join(log_dir, 'file_not_found.log')
     timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-
     with open(log_file_path, 'a', encoding='utf-8') as log_file:
         log_file.write(f"[{timestamp}] - {message}\n")
 
-# Regex compilada para remover quebras de linha, tabs e tags <br> ou <br/>
-CLEANING_PATTERN = re.compile(r'<br/?>|[\r\n\t]')
 
 def removeCRLF(field):
-    """Remove quebras de linha e tabulações de um objeto de match regex."""
-    return re.sub(r'[\r\n\t]', '', field.group(1)) if field else ''
+    """Remove quebras de linha, tabs e tags <br> de um objeto de match regex."""
+    return CLEANING_PATTERN.sub('', field.group(1)) if field else ''
 
 
 def removeCRLFString(text):
-    """Remove quebras de linha e tabulações de uma string."""
-    return re.sub(r'[\r\n\t]', '', text) if text else ''
-
-def removeCLRLBR(text):
+    """Remove quebras de linha, tabs e tags <br> de uma string."""
     return CLEANING_PATTERN.sub('', text) if text else ''
