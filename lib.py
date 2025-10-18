@@ -6,31 +6,6 @@ from const import *
 from utils import *
 
 
-def convert_timestamp_to_date(timestamp):
-    '''
-    Converte timestamp em formato legível de data
-    :param timestamp: Timestamp em milissegundos ou segundos
-    :return: String formatada de data ou valor original se não for timestamp
-    '''
-    if not timestamp:
-        return ''
-
-    try:
-        # Tentar converter assumindo milissegundos
-        if isinstance(timestamp, (int, float)):
-            # Se o timestamp for muito grande, provavelmente está em milissegundos
-            if timestamp > 10000000000:
-                timestamp = timestamp / 1000
-
-            data = datetime.fromtimestamp(timestamp)
-            return data.strftime('%d/%m/%Y %H:%M:%S')
-        else:
-            return str(timestamp)
-    except (ValueError, TypeError, OSError):
-        # Se falhar, retornar como string
-        return str(timestamp)
-
-
 def read_json_file(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8') as json_file:
@@ -41,7 +16,6 @@ def read_json_file(file_path):
     except json.JSONDecodeError:
         print(f"Error: Invalid JSON format in {file_path}")
         return None
-
 
 def _format_json_data(data, indent=0):
     formatted = ""
@@ -110,23 +84,23 @@ def json_to_csv(data, csv_file_path):
             # Escrever cabeçalho
             writer.writerow(ordered_keys)
 
-            list_index_seqDocumento = ['SeqDocumento', 'Seqdocumento', 'seqDocumento','SEQDOCUMENTO', 'seqdocumento']
+            ignorar_registro = False
             # Escrever linhas de dados
             for idx, item in enumerate(data, 1):
                 row = []
                 for key in ordered_keys:
-                    original_key = original_keys_map.get(key, key)
-                    value = item.get(original_key, '')
-                    if not value and original_key in list_index_seqDocumento:
-                        for index in list_index_seqDocumento:
-                            value = item.get(index)
-                            if value:
-                                break
+                    value = get_value_case_insensitive(item, key, original_keys_map)
 
-                    if not value:
+                    #considerar apenas acórdãos
+                    if key == 'TIPODOCUMENTO' and (value in ['DECISÃO', 'DECISAO']) :
+                        ignorar_registro = True
+                        break
+
+                    if key == 'SEQDOCUMENTO' and not value:
                         source_file = item.get('_source_file', 'desconhecido')
                         log_event(DIR_PATH_OUTPUT, f"Registro com SEQDOCUMENTO vazio encontrado no arquivo '{source_file}'. Registro: {item}")
-                        continue  # Pula para a próxima chave, mas continua processando a linha
+                        ignorar_registro = True
+                        break  # sai do loop e registra controle para não gravar registro
                     try:
                         # Tratamento especial para campos de data
                         if key in ['DATAPUBLICACAO', 'DATADISTRIBUICAO', 'DATAJULGAMENTO', 'DATARECEBIMENTO']:
@@ -142,11 +116,16 @@ def json_to_csv(data, csv_file_path):
                         else:
                             value = str(value)
                     except Exception as e:
-                        raise Exception(f'Erro inesperado ao tratar campo "{key}" com valor "{value}": Detalhe do erro: "{e}".')
+                        log_event(DIR_PATH_OUTPUT, f'Erro inesperado ao tratar campo "{key}" com valor "{value}": Detalhe do erro: "{e}".')
+                        ignorar_registro = True
+                        break
 
                     row.append(value)
 
-                writer.writerow(row)
+                if not ignorar_registro:
+                    writer.writerow(row)
+                else:
+                    ignorar_registro = False
 
                 # Mostrar progresso a cada 1000 registros
                 if idx % 1000 == 0:
@@ -167,6 +146,24 @@ def json_to_csv(data, csv_file_path):
         print(f"❌ Erro inesperado ao converter para CSV: {e}")
         return False
 
+
+def get_value_case_insensitive(item, normalized_key, original_keys_map):
+    """
+    Obtém um valor de um dicionário de forma insensível a maiúsculas/minúsculas,
+    especialmente para a chave 'SEQDOCUMENTO'.
+    """
+    # Se o item foi localizado normalmente, encerramos e já devolvemos o valor
+    original_key = original_keys_map.get(normalized_key, normalized_key)
+    value =  item.get(original_key, '')
+    if value:
+        return value
+
+    # Para a chave SEQDOCUMENTO, fazemos uma busca case-insensitive
+    if normalized_key == 'SEQDOCUMENTO':
+        for item_key, item_value in item.items():
+            if normalize_header_key(item_key) in LIST_FIELDS:
+                return item_value
+        return ''  # Retorna vazio se nenhuma variação for encontrada
 
 def read_all_json_files_from_directory(directory_path):
     """
@@ -553,7 +550,7 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
                 if txt_filepath:
                     with open(txt_filepath, 'r', encoding='utf-8') as txt_file:
                         content = txt_file.read()
-                        processed_data = _process_txt_content3(content)
+                        processed_data = _process_txt_content(content)
                         if processed_data:
                             acordao, ementa, relatorio, voto, decisao = processed_data
                             writer.writerow([seq_documento, acordao, ementa, relatorio, voto, decisao])
@@ -572,7 +569,7 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
         print(f"❌ Erro inesperado ao processar o arquivo de metadados: {e}")
         return False
 
-def _process_txt_content3(content):
+def _process_txt_content(content):
     """
     Extrai seções de um conteúdo de texto, independentemente da ordem das tags,
     com regras de prefixo específicas.
