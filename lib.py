@@ -508,92 +508,7 @@ def download_json_metadados():
         print(f"❌ Erro inesperado ao baixar arquivos JSON: {e}")
         return False
 
-
-def _process_txt_content(content):
-    """Função auxiliar para extrair seções de um conteúdo de texto."""
-    if YEAR_DOWNLOAD == '2024':
-        acordao = re.search('ACÓRDÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*RELATÓRIO', content, re.DOTALL)
-    else:
-        acordao = re.search('ACÓRDÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*EMENTA', content, re.DOTALL)
-        #acordao = re.search(r'ACÓRDÃO<br>(.*?)<br>EMENTA<br>', content, re.DOTALL)
-
-    if not acordao:
-        return None
-
-    if YEAR_DOWNLOAD == '2024':
-        ementa = re.search(r'EMENTA\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*VOTO', content, re.DOTALL)
-        relatorio = re.search(r'RELATÓRIO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*EMENTA', content, re.DOTALL)
-        voto = re.search(r'VOTO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
-        decisao = re.search(r'DECISÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
-    else:
-        #ementa = re.search(r'<br>EMENTA<br>(.*?)RELATÓRIO<br>', content, re.DOTALL)
-        ementa = re.search(r'EMENTA\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*RELATÓRIO', content, re.DOTALL)
-
-        #relatorio = re.search(r'RELATÓRIO<br>(.*?)<br>VOTO<br>', content, re.DOTALL)
-        relatorio = re.search(r'RELATÓRIO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*VOTO', content, re.DOTALL)
-
-        #voto = re.search(r'<br>VOTO<br>(.*)', content, re.DOTALL)
-        voto = re.search(r'VOTO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
-
-        #decisao = re.search(r'DECISÃO<br>(.*)', content, re.DOTALL)
-        decisao = re.search(r'DECISÃO\s*(?:</?br>\s*)*([\s\S]*?)\s*(?:</?br>\s*)*', content, re.DOTALL)
-
-    # A função removeCRLF já está em utils.py, então podemos usá-la
-    return (removeCRLF(acordao), removeCRLF(ementa), removeCRLF(relatorio),
-            removeCRLF(voto), removeCRLF(decisao))
-
-
-def read_txt_files_and_create_csv(directory_path, csv_file_path):
-    if not os.path.exists(directory_path):
-        print(f"❌ Erro: Diretório não encontrado em {directory_path}")
-        return False
-
-    txt_files = []
-    print(f"\n🔎 Procurando arquivos .txt recursivamente em: {directory_path}")
-    for dirpath, _, filenames in os.walk(directory_path):
-        for filename in filenames:
-            if filename.endswith('.txt'):
-                txt_files.append(os.path.join(dirpath, filename))
-
-    total_files = len(txt_files)
-
-    if total_files == 0:
-        print(f"⚠️ Nenhum arquivo .txt encontrado em {directory_path}")
-        return False
-
-    print(f"\n🔄 Iniciando processamento de {total_files} arquivos .txt encontrados.")
-    print(f"   Salvando em: {csv_file_path}")
-
-    with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
-        writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL, lineterminator='\n')
-        writer.writerow(['seqDocumento', 'acordao', 'ementa', 'relatorio', 'voto', 'decisao'])
-
-        for idx, file_path in enumerate(sorted(txt_files), 1):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-
-                processed_data = _process_txt_content(content)
-                if not processed_data:
-                    continue
-
-                relative_path = os.path.relpath(file_path, directory_path)
-                print(f"   Processando {idx}/{total_files}: {relative_path}")
-
-                seqDocumento = os.path.basename(file_path).replace('.txt', '')
-
-                acordao, ementa, relatorio, voto, decisao = processed_data
-                writer.writerow([seqDocumento, acordao, ementa, relatorio, voto, decisao])
-
-            except Exception as e:
-                print(f"      ❌ Erro ao processar o arquivo {relative_path}: {e}")
-                return False
-
-    print(f"✅ Processamento concluído. {total_files} arquivos processados.")
-    return True
-
-
-def read_txt_files_and_create_csv2(metadata_csv_path, search_dir, output_csv_path, log_dir):
+def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path, log_dir):
     """
     Cria um CSV com detalhes de acórdãos, usando um CSV de metadados como guia.
     """
@@ -638,7 +553,7 @@ def read_txt_files_and_create_csv2(metadata_csv_path, search_dir, output_csv_pat
                 if txt_filepath:
                     with open(txt_filepath, 'r', encoding='utf-8') as txt_file:
                         content = txt_file.read()
-                        processed_data = _process_txt_content(content)
+                        processed_data = _process_txt_content3(content)
                         if processed_data:
                             acordao, ementa, relatorio, voto, decisao = processed_data
                             writer.writerow([seq_documento, acordao, ementa, relatorio, voto, decisao])
@@ -657,3 +572,52 @@ def read_txt_files_and_create_csv2(metadata_csv_path, search_dir, output_csv_pat
         print(f"❌ Erro inesperado ao processar o arquivo de metadados: {e}")
         return False
 
+def _process_txt_content3(content):
+    """
+    Extrai seções de um conteúdo de texto, independentemente da ordem das tags,
+    com regras de prefixo específicas.
+    - RELATÓRIO, EMENTA, VOTO: Devem ser precedidos por <br> ou quebra de linha.
+    - ACÓRDÃO, DECISÃO: Podem aparecer em qualquer lugar.
+    """
+    m_tags = ['RELATÓRIO', 'EMENTA', 'VOTO']
+    o_tags = ['ACÓRDÃO', 'DECISÃO']
+
+    # Padrão para tags com prefixo obrigatório. Captura a tag no grupo 1.
+    pattern_mandatory = r'(?:<br/?>|\n)\s*(' + '|'.join(m_tags) + r')'
+
+    # Padrão para tags com prefixo opcional. Captura a tag no grupo 2.
+    pattern_optional = r'(' + '|'.join(o_tags) + r')'
+
+    # Regex final que combina os dois padrões, ignorando lixo ao redor.
+    tag_pattern = re.compile(r'(?:</?br>|\s)*' + f'(?:{pattern_mandatory}|{pattern_optional})' + r'\s*(?:</?br>|\s)*')
+
+    found_tags = []
+    for match in tag_pattern.finditer(content):
+        # O grupo 1 conterá a tag se a regra 'mandatory' corresponder.
+        # O grupo 2 conterá a tag se a regra 'optional' corresponder.
+        tag_name = match.group(1) or match.group(2)
+        if tag_name:
+            found_tags.append({'tag': tag_name, 'start': match.start(), 'end': match.end()})
+
+    if not found_tags:
+        return None
+
+    # Ordena as tags pela posição em que aparecem no texto
+    found_tags.sort(key=lambda x: x['start'])
+
+    extracted_data = {}
+    for i, current_tag_info in enumerate(found_tags):
+        start_of_content = current_tag_info['end']
+        end_of_content = found_tags[i + 1]['start'] if i + 1 < len(found_tags) else len(content)
+
+        text_slice = content[start_of_content:end_of_content]
+        extracted_data[current_tag_info['tag']] = removeCRLFString(text_slice)
+
+    # Aplica a regra de negócio: se ACÓRDÃO existe, DECISÃO deve ser vazio.
+    acordao_text = extracted_data.get('ACÓRDÃO', '')
+    decisao_text = '' if acordao_text else extracted_data.get('DECISÃO', '')
+
+    # Retorna os dados na ordem padrão, aplicando a regra de exclusividade
+    return (acordao_text, extracted_data.get('EMENTA', ''),
+            extracted_data.get('RELATÓRIO', ''), extracted_data.get('VOTO', ''),
+            decisao_text)
