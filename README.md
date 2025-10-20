@@ -18,7 +18,7 @@ This project has no external dependencies.
 ## How to Use
 
 1.  **Configure the constants:**
-    *   Open the `const.py` file and set the `YEAR_DOWNLOAD` variable to the desired year.
+    *   Open the `const.py` file and set the `YEAR_DOWNLOAD` or `MONTH_DOWNLOAD` variable to the desired year or month under year.
 2.  **Run the main script:**
     *   Execute the main Python script to start the data extraction and processing.
 
