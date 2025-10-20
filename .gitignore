@@ -65,6 +65,44 @@ env/
 venv/
 ENV/
 
+# -------------------------------------------------------------------
+# IntelliJ IDEA / PyCharm specific files
+# -------------------------------------------------------------------
+.idea/
+*.iml
+out/
+.idea/shelf/
+
+# -------------------------------------------------------------------
+# Python virtual environments and caches
+# -------------------------------------------------------------------
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Distribution and packaging
+dist/
+build/
+*.egg-info/
+
+# Compiled extensions
+*.so
+*.pyd
+
+# Testing and Type Checking
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# -------------------------------------------------------------------
+# Operating System files
+# -------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+
 # If you are using PyCharm # 
 .idea/**/workspace.xml 
 .idea/**/tasks.xml 
@@ -79,6 +117,7 @@ ENV/
 .idea/**/gradle.xml 
 .idea/**/libraries 
 *.iws /out/ 
+
 
 # Sublime Text
 *.tmlanguage.cache 
