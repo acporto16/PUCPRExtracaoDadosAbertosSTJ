@@ -88,13 +88,14 @@ def json_to_csv(data, csv_file_path):
             # Escrever linhas de dados
             for idx, item in enumerate(data, 1):
                 row = []
+
+                value = get_value_case_insensitive(item, 'tipoDocumento', original_keys_map)
+                #considerar apenas o tipo de documento especificado na constante TIPO_DOCUMENTO
+                if not (value in LISTA_TIPO_DOCUMENTO):
+                    continue
+
                 for key in ordered_keys:
                     value = get_value_case_insensitive(item, key, original_keys_map)
-
-                    #considerar apenas o tipo de documento especificado na constante TIPO_DOCUMENTO
-                    if not (key == 'TIPODOCUMENTO' and (value in LISTA_TIPO_DOCUMENTO)) :
-                        ignorar_registro = True
-                        break
 
                     if key == 'SEQDOCUMENTO' and not value:
                         source_file = item.get('_source_file', 'desconhecido')
