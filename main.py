@@ -13,23 +13,23 @@ from datetime import datetime, timedelta
 
 def main():
     # """Função principal para orquestrar os passos de extração e processamento de dados."""
-    #01
-    if not download_zip_files():
-        print("Falha ao baixar os arquivos zip.")
-        return
-    print("Arquivos zip baixados com sucesso.")
-
-    #02
-    if not download_json_metadados():
-        print("Falha ao baixar os arquivos JSON.")
-        return
-    print("Arquivos JSON baixados com sucesso.")
-
-    #03
-    if not extract_zip_files():
-        print("Falha ao extrair os arquivos zip.")
-        return
-    print("Arquivos zip extraídos com sucesso.")
+    # #01
+    # if not download_zip_files():
+    #     print("Falha ao baixar os arquivos zip.")
+    #     return
+    # print("Arquivos zip baixados com sucesso.")
+    #
+    # #02
+    # if not download_json_metadados():
+    #     print("Falha ao baixar os arquivos JSON.")
+    #     return
+    # print("Arquivos JSON baixados com sucesso.")
+    #
+    # #03
+    # if not extract_zip_files():
+    #     print("Falha ao extrair os arquivos zip.")
+    #     return
+    # print("Arquivos zip extraídos com sucesso.")
 
     #04
     if not json_directory_to_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS):
