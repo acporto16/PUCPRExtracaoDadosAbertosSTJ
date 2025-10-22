@@ -91,8 +91,8 @@ def json_to_csv(data, csv_file_path):
                 for key in ordered_keys:
                     value = get_value_case_insensitive(item, key, original_keys_map)
 
-                    #considerar apenas acórdãos
-                    if key == 'TIPODOCUMENTO' and (value in ['DECISÃO', 'DECISAO']) :
+                    #considerar apenas o tipo de documento especificado na constante TIPO_DOCUMENTO
+                    if not (key == 'TIPODOCUMENTO' and (value in LISTA_TIPO_DOCUMENTO)) :
                         ignorar_registro = True
                         break
 
@@ -525,7 +525,7 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
 
             for row in reader:
                 # Verifica se a linha tem a chave 'TIPODOCUMENTO' (normalizada) e se o valor é ACORDAO
-                if 'TIPODOCUMENTO' in row and row['TIPODOCUMENTO'].upper() in ('ACÓRDÃO', 'ACORDAO'):
+                if 'TIPODOCUMENTO' in row and row['TIPODOCUMENTO'].upper() in LISTA_TIPO_DOCUMENTO:
                     seq = row.get('SEQDOCUMENTO')
                     if seq:
                         sequences_to_process.append(seq)
