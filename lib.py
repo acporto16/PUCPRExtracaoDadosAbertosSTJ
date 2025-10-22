@@ -239,7 +239,6 @@ def read_all_json_files_from_directory(directory_path):
         print(f"❌ Erro ao processar diretório: {e}")
         return None
 
-
 def json_directory_to_csv(directory_path, csv_file_path):
     """
     Lê todos os arquivos JSON de um diretório e converte para um único arquivo CSV.
@@ -274,7 +273,6 @@ def json_directory_to_csv(directory_path, csv_file_path):
         print("\n❌ Falha na conversão para CSV")
 
     return success
-
 
 def add_decision_column(csv_file_path):
     try:
@@ -507,7 +505,7 @@ def download_json_metadados():
 
 def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path, log_dir):
     """
-    Cria um CSV com detalhes de acórdãos, usando um CSV de metadados como guia.
+    Cria um CSV com detalhes de acórdãos/decisões, usando um CSV de metadados como guia.
     """
     print("\n🔄 Iniciando processamento de TXTs guiado por metadados...")
 
@@ -530,7 +528,7 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
                     if seq:
                         sequences_to_process.append(seq)
 
-        print(f"   -> Encontrados {len(sequences_to_process)} documentos do tipo 'ACÓRDÃO'.")
+        print(f"   -> Encontrados {len(sequences_to_process)} documentos do tipo '{LISTA_TIPO_DOCUMENTO[0]}'.")
 
         # Etapa 2, 3 e 4: Buscar, processar e escrever os dados, e registrar falhas.
         with open(output_csv_path, 'w', newline='', encoding='utf-8') as out_file:
@@ -571,50 +569,51 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
 
 def _process_txt_content(content):
     """
-    Extrai seções de um conteúdo de texto, independentemente da ordem das tags,
-    com regras de prefixo específicas.
-    - RELATÓRIO, EMENTA, VOTO: Devem ser precedidos por <br> ou quebra de linha.
-    - ACÓRDÃO, DECISÃO: Podem aparecer em qualquer lugar.
+    Extrai seções de um conteúdo de texto com regras complexas e priorizadas.
+    1. Verifica se o texto inicia com 'DECISÃO'. Se sim, captura todo o conteúdo.
+    2. Se não, processa como um 'ACÓRDÃO', buscando as demais seções (EMENTA, RELATÓRIO, VOTO).
     """
+    # REGRA 2: Verifica se o documento é uma DECISÃO no início.
+    decisao_start_pattern = re.compile(r'^\s*(?:</?br>|\s)*DECISÃO', re.IGNORECASE)
+    match_decisao = decisao_start_pattern.search(content)
+    if match_decisao:
+        # Se for uma DECISÃO, o conteúdo é tudo após a tag.
+        start_of_content = match_decisao.end()
+        decisao_text = content[start_of_content:].strip()
+        # Retorna apenas o campo decisão preenchido.
+        return ('', '', '', '', removeCRLFString(decisao_text))
+
+    # Se não for DECISÃO, processa como ACÓRDÃO (REGRA 1)
     m_tags = ['RELATÓRIO', 'EMENTA', 'VOTO']
-    o_tags = ['ACÓRDÃO', 'DECISÃO']
+    start_tag = 'ACÓRDÃO'
 
-    # Padrão para tags com prefixo obrigatório. Captura a tag no grupo 1.
-    pattern_mandatory = r'(?:<br/?>|\n)\s*(' + '|'.join(m_tags) + r')'
+    pattern_start = r'^\s*(?:</?br>|\s)*(' + start_tag + r')'
+    pattern_mandatory_prefix = r'(?:<br/?>|\n)\s*(' + '|'.join(m_tags) + r')'
 
-    # Padrão para tags com prefixo opcional. Captura a tag no grupo 2.
-    pattern_optional = r'(' + '|'.join(o_tags) + r')'
-
-    # Regex final que combina os dois padrões, ignorando lixo ao redor.
-    tag_pattern = re.compile(r'(?:</?br>|\s)*' + f'(?:{pattern_mandatory}|{pattern_optional})' + r'\s*(?:</?br>|\s)*')
+    tag_pattern = re.compile(
+        r'(?:</?br>|\s)*' + f'(?:{pattern_start}|{pattern_mandatory_prefix})' + r'\s*(?:</?br>|\s)*')
 
     found_tags = []
     for match in tag_pattern.finditer(content):
-        # O grupo 1 conterá a tag se a regra 'mandatory' corresponder.
-        # O grupo 2 conterá a tag se a regra 'optional' corresponder.
-        tag_name = match.group(1) or match.group(2)
+        tag_name = next((g for g in match.groups() if g is not None), None)
         if tag_name:
             found_tags.append({'tag': tag_name, 'start': match.start(), 'end': match.end()})
 
     if not found_tags:
         return None
 
-    # Ordena as tags pela posição em que aparecem no texto
     found_tags.sort(key=lambda x: x['start'])
 
     extracted_data = {}
     for i, current_tag_info in enumerate(found_tags):
         start_of_content = current_tag_info['end']
         end_of_content = found_tags[i + 1]['start'] if i + 1 < len(found_tags) else len(content)
-
         text_slice = content[start_of_content:end_of_content]
         extracted_data[current_tag_info['tag']] = removeCRLFString(text_slice)
 
-    # Aplica a regra de negócio: se ACÓRDÃO existe, DECISÃO deve ser vazio.
+    # Como já tratamos DECISÃO, aqui só precisamos montar o resultado para ACÓRDÃO.
     acordao_text = extracted_data.get('ACÓRDÃO', '')
-    decisao_text = '' if acordao_text else extracted_data.get('DECISÃO', '')
 
-    # Retorna os dados na ordem padrão, aplicando a regra de exclusividade
     return (acordao_text, extracted_data.get('EMENTA', ''),
             extracted_data.get('RELATÓRIO', ''), extracted_data.get('VOTO', ''),
-            decisao_text)
+            '')  # O campo decisão sempre será vazio neste fluxo.
