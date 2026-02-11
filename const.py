@@ -1,7 +1,7 @@
 import os
 
 YEAR_DOWNLOAD = '2025'
-MONTH_DOWNLOAD = 9
+MONTH_DOWNLOAD = 0
 #LISTA_TIPO_DOCUMENTO = ['DECISAO', 'DECISÃO']
 LISTA_TIPO_DOCUMENTO = ['ACORDAO', 'ACÓRDÃO']
 
@@ -13,7 +13,7 @@ UNZIP_DIR_PATH = os.path.join(DIR_PATH, 'arquivos', YEAR_DOWNLOAD)
 
 DIR_PATH_OUTPUT = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD)
 DIR_PATH_DOWNLOAD_DADOS_METADADOS = os.path.join(DIR_PATH, 'arquivos', YEAR_DOWNLOAD)
-DIR_PATH_OUTPUT_DADOS_METADADOS = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD, f'metadados-decisoes-acordaos-dj{YEAR_DOWNLOAD}.csv')
-DIR_PATH_OUTPUT_DECISOES_ACORDAOS = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD, f'decisoes-acordaos-dj{YEAR_DOWNLOAD}.csv')
+DIR_PATH_OUTPUT_DADOS_METADADOS = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD, f'metadados-acordaos-dj{YEAR_DOWNLOAD}.csv')
+DIR_PATH_OUTPUT_DECISOES_ACORDAOS = os.path.join(DIR_PATH, 'output', YEAR_DOWNLOAD, f'acordaos-dj{YEAR_DOWNLOAD}.csv')
 
 JSON_FILE_DOWNLOAD = f'metadados{YEAR_DOWNLOAD}'
