@@ -1,6 +1,7 @@
 from lib import *
 import time
 from datetime import datetime, timedelta
+import pkg_resources
 
 '''
     Autor: Alessandro C Porto
@@ -11,8 +12,33 @@ from datetime import datetime, timedelta
     dados.
 '''
 
+def print_installed_libraries():
+    print("Bibliotecas instaladas no ambiente:")
+    installed_packages = pkg_resources.working_set
+    installed_packages_list = sorted(["%s==%s" % (i.key, i.version) for i in installed_packages])
+    for package in installed_packages_list:
+        print(f"  - {package}")
+    print("-" * 60)
+
 def main():
     # """Função principal para orquestrar os passos de extração e processamento de dados."""
+    
+    print("=" * 60)
+    print("👋 Olá! Bem-vindo ao Extrator de Dados de Acórdãos e Decisões.")
+    print("=" * 60)
+    
+    print_installed_libraries()
+    
+    resposta = input("\nDeseja iniciar a execução do processo de extração? (s/n): ")
+    
+    if resposta.lower() != 's':
+        print("\nExecução cancelada pelo usuário.")
+        return
+        
+    print("\n" + "-" * 60)
+    print("🚀 Iniciando extração de dados...")
+    print("-" * 60)
+    
     #01
     if not download_zip_files():
         print("Falha ao baixar os arquivos zip.")
@@ -46,7 +72,7 @@ def main():
 if __name__ == "__main__":
     start_time_display = datetime.now()
     start_time_perf = time.perf_counter()
-    print(f"🚀 Início da execução: {start_time_display.strftime('%d/%m/%Y %H:%M:%S')}")
+    print(f"⏱️ Início da execução: {start_time_display.strftime('%d/%m/%Y %H:%M:%S')}")
     print("-" * 60)
 
     main()
