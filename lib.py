@@ -378,7 +378,7 @@ def download_json_metadados():
     Regras aplicadas:
     1) Obtém somente arquivos no formato metadadosYYYYMMDD.json
     2) Restringe apenas aos arquivos de YYYY (metadadosYYYYMMDD.json)
-    3) Salva os arquivos no diretório: C:\_PUCPR\PrjDadosAbertos\arquivos
+    3) Salva os arquivos no diretório: C:\\_PUCPR\\PrjDadosAbertos\\arquivos
 
     :return: bool - True se o download foi bem-sucedido, False caso contrário
     '''
@@ -397,7 +397,7 @@ def download_json_metadados():
         month_pattern = "(0[1-9]|1[0-2])"
         print(f"\n🔎 Filtrando downloads de metadados para todos os meses de {YEAR_DOWNLOAD}")
 
-    json_pattern = re.compile(f'^{JSON_FILE_DOWNLOAD}{month_pattern}(0[1-9]|[12]\d|3[01])\.json$')
+    json_pattern = re.compile(rf'^{JSON_FILE_DOWNLOAD}{month_pattern}(0[1-9]|[12]\d|3[01])\.json$')
 
     try:
         print("Conectando ao site do STJ para buscar arquivos JSON...")

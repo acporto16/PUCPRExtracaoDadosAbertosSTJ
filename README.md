@@ -13,6 +13,20 @@ Este projeto tem como objetivo automatizar a extração e o processamento de dad
 2.  **Execução:** Inicie o processo através do script principal `main.py`.
 3.  **Ambiente:** Requer Python 3.12 e as bibliotecas listadas no ambiente de execução.
 
+
+#### Dependências externas usadas pelo projeto
+- `requests`
+
+#### Instalação sugerida
+```powershell
+py -3 -m pip install requests
+```
+
+#### (Opcional) Exportar todas as bibliotecas instaladas com versão
+```powershell
+py -3 -m pip freeze
+```
+
 ---
 *Autor: Alessandro C Porto*
 

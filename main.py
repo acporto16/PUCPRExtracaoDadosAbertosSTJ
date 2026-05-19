@@ -1,7 +1,8 @@
 from lib import *
 import time
+import threading
+from queue import Empty, Queue
 from datetime import datetime, timedelta
-import pkg_resources
 
 '''
     Autor: Alessandro C Porto
@@ -12,26 +13,40 @@ import pkg_resources
     dados.
 '''
 
-def print_installed_libraries():
-    print("Bibliotecas instaladas no ambiente:")
-    installed_packages = pkg_resources.working_set
-    installed_packages_list = sorted(["%s==%s" % (i.key, i.version) for i in installed_packages])
-    for package in installed_packages_list:
-        print(f"  - {package}")
-    print("-" * 60)
+
+def input_with_timeout(prompt, timeout_seconds, default_value):
+    """Lê input do usuário com timeout e retorna valor padrão se não houver resposta."""
+    result_queue = Queue(maxsize=1)
+
+    def _read_input():
+        try:
+            result_queue.put(input(prompt))
+        except EOFError:
+            result_queue.put('')
+
+    input_thread = threading.Thread(target=_read_input, daemon=True)
+    input_thread.start()
+
+    try:
+        return result_queue.get(timeout=timeout_seconds)
+    except Empty:
+        print(f"\n⏳ Sem confirmação em {timeout_seconds} segundos. Iniciando automaticamente...")
+        return default_value
 
 def main():
     # """Função principal para orquestrar os passos de extração e processamento de dados."""
     
     print("=" * 60)
-    print("👋 Olá! Bem-vindo ao Extrator de Dados de Acórdãos e Decisões.")
+    print("📥 Olá! Bem-vindo ao Extrator de Dados de Acórdãos e Decisões.")
     print("=" * 60)
     
-    print_installed_libraries()
+    resposta = input_with_timeout(
+        f"\nDeseja iniciar a execução do processo de extração? (s/n) [auto em {TIME_START_SYSTEM}s]: ",
+        timeout_seconds=TIME_START_SYSTEM,
+        default_value=DEFAULT_START_CONFIRMATION
+    )
     
-    resposta = input("\nDeseja iniciar a execução do processo de extração? (s/n): ")
-    
-    if resposta.lower() != 's':
+    if resposta.strip().upper() != 'S':
         print("\nExecução cancelada pelo usuário.")
         return
         

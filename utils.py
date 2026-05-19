@@ -89,3 +89,37 @@ def normalize_header_key(key: str) -> str:
 
     return chave_final
 
+
+def normalize_tipo_documento(value: str) -> str:
+    """Normaliza texto para comparação (sem acento, minúsculo, sem espaços extras)."""
+    if not isinstance(value, str):
+        return ''
+    return unicodedata.normalize('NFD', value).encode('ascii', 'ignore').decode('utf-8').strip().lower()
+
+
+def tipo_documento_slug(lista_tipo_documento):
+    """
+    Retorna slug elegante para nome de arquivo:
+    - DECISÃO/DECISAO -> decisoes
+    - ACÓRDÃO/ACORDAO -> acordaos
+    Fallback: normalizado + 's'
+    """
+    if not lista_tipo_documento:
+        return 'documentos'
+
+    base = normalize_tipo_documento(lista_tipo_documento[0])
+
+    mapa = {
+        'decisao': 'decisoes',
+        'acordao': 'acordaos',
+    }
+    return mapa.get(base, f'{base}s' if base else 'documentos')
+
+
+def periodo_arquivo(year_download, month_download):
+    """Monta sufixo temporal para o arquivo: YYYY ou MMYYYY."""
+    if month_download is None:
+        return str(year_download)
+    return f"{str(month_download).zfill(2)}{year_download}"
+
+
