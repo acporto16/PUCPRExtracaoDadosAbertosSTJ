@@ -3,6 +3,7 @@ import re
 import unicodedata
 import json
 from datetime import datetime
+from functools import lru_cache
 
 
 # Regex compilada para remover quebras de linha, tabs e tags <br> ou <br/>
@@ -21,6 +22,26 @@ def find_file_recursively(root_dir, filename):
         if filename in filenames:
             return os.path.join(dirpath, filename)
     return None
+
+
+def build_file_index_recursively(root_dir, suffix_filter=None):
+    """
+    Cria um índice {nome_do_arquivo: caminho_completo} varrendo o diretório recursivamente.
+    Mantém o primeiro arquivo encontrado para cada nome, preservando o comportamento de busca sequencial.
+    """
+    index = {}
+
+    if not os.path.exists(root_dir):
+        return index
+
+    for dirpath, _, filenames in os.walk(root_dir):
+        for filename in filenames:
+            if suffix_filter and not filename.endswith(suffix_filter):
+                continue
+
+            index.setdefault(filename, os.path.join(dirpath, filename))
+
+    return index
 
 
 def log_event(log_dir, message):
@@ -65,6 +86,7 @@ def convert_timestamp_to_date(timestamp):
         # Se falhar, retornar como string
         return str(timestamp)
 
+@lru_cache(maxsize=2048)
 def normalize_header_key(key: str) -> str:
     """
     Normaliza uma string para ser usada como chave de cabeçalho de CSV.

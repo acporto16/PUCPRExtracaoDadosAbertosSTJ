@@ -4,6 +4,7 @@ import os
 import importlib
 from queue import Empty, Queue
 from datetime import datetime, timedelta
+from const import DEFAULT_START_CONFIRMATION, TIME_START_SYSTEM
 from utils import load_config, save_config
 
 if os.name == 'nt':
@@ -187,7 +188,6 @@ if __name__ == "__main__":
 
     # Importar lib e funções de configuração
     import lib
-    from const import TIME_START_SYSTEM, DEFAULT_START_CONFIRMATION
     
     # Executar main()
     main()

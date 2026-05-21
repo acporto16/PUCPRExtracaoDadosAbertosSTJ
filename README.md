@@ -7,6 +7,7 @@ Este projeto tem como objetivo automatizar a extração e o processamento de dad
 - **Download Automatizado:** Captura arquivos ZIP e metadados JSON diretamente do portal de dados abertos do STJ.
 - **Processamento de Dados:** Descompacta arquivos, extrai o conteúdo textual de decisões e acórdãos e consolida as informações.
 - **Estruturação:** Converte metadados e conteúdos processados para o formato CSV, facilitando a análise de dados.
+- **Otimização de Desempenho:** Reutiliza conexão HTTP e indexa os TXT uma única vez para reduzir buscas repetidas em disco.
 - **✨ NOVO: Configuração Interativa:** Menu intuitivo para configurar parâmetros sem editar código-fonte.
 
 ### Como Utilizar

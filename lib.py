@@ -2,8 +2,14 @@ import json
 import csv
 import requests
 import zipfile
+from requests import Session
 from const import *
 from utils import *
+
+# Conjuntos fixos para lookup O(1) por campo — evitam comparação linear por linha
+_DATE_FIELDS = frozenset({'DATAPUBLICACAO', 'DATADISTRIBUICAO', 'DATAJULGAMENTO', 'DATARECEBIMENTO'})
+_TEXT_CLEAN_FIELDS = frozenset({'RECURSO', 'TEOR', 'DESCRICAOMONOCRATICA'})
+_LISTA_TIPO_DOC_SET = frozenset(v.upper() for v in LISTA_TIPO_DOCUMENTO)
 
 
 def _directory_contains_matching_files(directory_path, matcher):
@@ -31,7 +37,19 @@ def _safe_remove_file(file_path):
         log_event(DIR_PATH_OUTPUT, f"Falha ao remover arquivo temporário/inválido '{file_path}'. Detalhe: {e}")
 
 
-def read_json_file(file_path):
+_LIST_FIELDS_SET = frozenset(normalize_header_key(f) for f in LIST_FIELDS)
+
+
+def _check_for_duplicate_keys(ordered_pairs):
+    """Hook para o json.load que verifica chaves duplicadas."""
+    d = {}
+    for key, value in ordered_pairs:
+        if key in d:
+            raise ValueError(f"Chave duplicada encontrada: '{key}'")
+        d[key] = value
+    return d
+
+
     try:
         with open(file_path, 'r', encoding='utf-8') as json_file:
             return json.load(json_file)
@@ -82,18 +100,20 @@ def json_to_csv(data, csv_file_path):
     try:
         # Coletar todas as chaves únicas mantendo a ordem do primeiro registro
         ordered_keys = []
+        ordered_keys_set = set()
         if data:
             # Preservar ordem das chaves do primeiro registro
-            # Normaliza as chaves do primeiro registro
             ordered_keys = [normalize_header_key(key) for key in data[0].keys()]
+            ordered_keys_set = set(ordered_keys)
             original_keys_map = {normalize_header_key(key): key for key in data[0].keys()}
 
-            # Adicionar chaves que aparecem em outros registros
+            # Adicionar chaves que aparecem em outros registros (schemas diferentes entre arquivos)
             for item in data[1:]:
                 for key in item.keys():
                     normalized_key = normalize_header_key(key)
-                    if normalized_key not in ordered_keys:
+                    if normalized_key not in ordered_keys_set:
                         ordered_keys.append(normalized_key.upper())
+                        ordered_keys_set.add(normalized_key.upper())
                         original_keys_map[normalized_key] = key.upper()
 
         print(f"Convertendo {len(data)} registros com {len(ordered_keys)} campos para CSV...")
@@ -116,7 +136,7 @@ def json_to_csv(data, csv_file_path):
 
                 value = get_value_case_insensitive(item, 'tipoDocumento', original_keys_map)
                 #considerar apenas o tipo de documento especificado na constante TIPO_DOCUMENTO
-                if not (value in LISTA_TIPO_DOCUMENTO):
+                if value.upper() not in _LISTA_TIPO_DOC_SET:
                     continue
 
                 for key in ordered_keys:
@@ -129,9 +149,9 @@ def json_to_csv(data, csv_file_path):
                         break  # sai do loop e registra controle para não gravar registro
                     try:
                         # Tratamento especial para campos de data
-                        if key in ['DATAPUBLICACAO', 'DATADISTRIBUICAO', 'DATAJULGAMENTO', 'DATARECEBIMENTO']:
+                        if key in _DATE_FIELDS:
                             value = convert_timestamp_to_date(value)
-                        if key in ['RECURSO', 'TEOR', 'DESCRICAOMONOCRATICA']:
+                        elif key in _TEXT_CLEAN_FIELDS:
                             value = removeCRLFString(value)
                         # Tratamento para listas e dicionários
                         elif isinstance(value, (list, dict)):
@@ -187,7 +207,7 @@ def get_value_case_insensitive(item, normalized_key, original_keys_map):
     # Para a chave SEQDOCUMENTO, fazemos uma busca case-insensitive
     if normalized_key == 'SEQDOCUMENTO':
         for item_key, item_value in item.items():
-            if normalize_header_key(item_key) in LIST_FIELDS:
+            if normalize_header_key(item_key) in _LIST_FIELDS_SET:
                 return item_value
         return ''  # Retorna vazio se nenhuma variação for encontrada
 
@@ -227,19 +247,10 @@ def read_all_json_files_from_directory(directory_path):
             relative_path = os.path.relpath(file_path, directory_path)
             print(f"\n📄 Lendo arquivo: {relative_path}")
 
-            def check_for_duplicate_keys(ordered_pairs):
-                """Hook para o json.load que verifica chaves duplicadas."""
-                d = {}
-                for key, value in ordered_pairs:
-                    if key in d:
-                        raise ValueError(f"Chave duplicada encontrada: '{key}'")
-                    d[key] = value
-                return d
-
             try:
                 with open(file_path, 'r', encoding='utf-8') as json_file:
                     # Usa o hook para verificar chaves duplicadas durante a leitura
-                    data = json.load(json_file, object_pairs_hook=check_for_duplicate_keys)
+                    data = json.load(json_file, object_pairs_hook=_check_for_duplicate_keys)
 
                     # Verificar se o arquivo contém uma lista ou um único objeto
                     if isinstance(data, list):
@@ -268,6 +279,7 @@ def read_all_json_files_from_directory(directory_path):
 def json_directory_to_csv(directory_path, csv_file_path):
     """
     Lê todos os arquivos JSON de um diretório e converte para um único arquivo CSV.
+    Processa arquivo por arquivo (streaming) para evitar pico de memória RAM.
 
     :param directory_path: Caminho do diretório contendo os arquivos JSON
     :param csv_file_path: Caminho do arquivo CSV de saída
@@ -277,43 +289,168 @@ def json_directory_to_csv(directory_path, csv_file_path):
     print("🔄 INICIANDO CONVERSÃO DE ARQUIVOS JSON PARA CSV")
     print("=" * 60)
 
-    # Ler todos os arquivos JSON do diretório
-    all_data = read_all_json_files_from_directory(directory_path)
-
-    if all_data is None:
+    if not os.path.exists(directory_path):
+        print(f"❌ Erro: Diretório não encontrado: {directory_path}")
         if os.path.exists(csv_file_path):
-            mensagem = f"Falha ao ler arquivos JSON em '{directory_path}'. Utilizando CSV de metadados já existente em '{csv_file_path}'."
+            mensagem = f"Diretório JSON '{directory_path}' não encontrado. Utilizando CSV já existente em '{csv_file_path}'."
             log_event(DIR_PATH_OUTPUT, mensagem)
             print(f"⚠️ {mensagem}")
             return True
-        print("❌ Falha ao ler arquivos JSON")
         return False
 
-    if not all_data:
+    # Coleta e ordena arquivos JSON
+    json_files = sorted(
+        os.path.join(dirpath, filename)
+        for dirpath, _, filenames in os.walk(directory_path)
+        for filename in filenames
+        if filename.endswith('.json')
+    )
+
+    if not json_files:
+        print(f"⚠️ Nenhum arquivo JSON encontrado em: {directory_path}")
         if os.path.exists(csv_file_path):
-            mensagem = f"Nenhum dado JSON novo para converter em '{directory_path}'. Utilizando CSV já existente em '{csv_file_path}'."
+            mensagem = f"Nenhum JSON encontrado em '{directory_path}'. Utilizando CSV já existente em '{csv_file_path}'."
             log_event(DIR_PATH_OUTPUT, mensagem)
             print(f"⚠️ {mensagem}")
             return True
-        print("⚠️ Nenhum dado para converter")
         return False
 
-    # Converter para CSV
-    success = json_to_csv(all_data, csv_file_path)
+    print(f"\n📂 Encontrados {len(json_files)} arquivos JSON.")
 
-    if success:
+    ensure_dir_exists(os.path.dirname(csv_file_path))
+
+    ordered_keys = []
+    ordered_keys_set = set()
+    original_keys_map = {}
+    header_written = False
+    total_records = 0
+    total_written = 0
+
+    try:
+        with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_out:
+            writer = csv.writer(csv_out, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL)
+
+            for file_path in json_files:
+                relative_path = os.path.relpath(file_path, directory_path)
+                print(f"\n📄 Lendo arquivo: {relative_path}")
+
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as json_file:
+                        data = json.load(json_file, object_pairs_hook=_check_for_duplicate_keys)
+
+                    if isinstance(data, dict):
+                        data = [data]
+                    elif not isinstance(data, list):
+                        print(f"   ⚠️ Formato não reconhecido (não é lista nem dicionário)")
+                        continue
+
+                    if not data:
+                        print(f"   ⚠️ Arquivo vazio")
+                        continue
+
+                    print(f"   ✅ {len(data)} registros lidos")
+                    total_records += len(data)
+
+                    # Primeiro arquivo: extrai o cabeçalho e escreve
+                    if not header_written:
+                        ordered_keys = [normalize_header_key(k) for k in data[0].keys()]
+                        ordered_keys_set = set(ordered_keys)
+                        original_keys_map = {normalize_header_key(k): k for k in data[0].keys()}
+                        writer.writerow(ordered_keys)
+                        header_written = True
+
+                    # Atualiza chaves para arquivos com schema diferente
+                    for item in data:
+                        for key in item.keys():
+                            nk = normalize_header_key(key)
+                            if nk not in ordered_keys_set:
+                                ordered_keys.append(nk.upper())
+                                ordered_keys_set.add(nk.upper())
+                                original_keys_map[nk] = key.upper()
+
+                    # Escreve linha a linha (sem acumular em memória)
+                    ignorar_registro = False
+                    for idx, item in enumerate(data, 1):
+                        value = get_value_case_insensitive(item, 'tipoDocumento', original_keys_map)
+                        if value.upper() not in _LISTA_TIPO_DOC_SET:
+                            continue
+
+                        row = []
+                        for key in ordered_keys:
+                            value = get_value_case_insensitive(item, key, original_keys_map)
+
+                            if key == 'SEQDOCUMENTO' and not value:
+                                source_file = item.get('_source_file', relative_path)
+                                log_event(DIR_PATH_OUTPUT, f"Registro com SEQDOCUMENTO vazio no arquivo '{source_file}'. Registro: {item}")
+                                ignorar_registro = True
+                                break
+
+                            try:
+                                if key in _DATE_FIELDS:
+                                    value = convert_timestamp_to_date(value)
+                                elif key in _TEXT_CLEAN_FIELDS:
+                                    value = removeCRLFString(value)
+                                elif isinstance(value, (list, dict)):
+                                    value = json.dumps(value, ensure_ascii=False)
+                                elif value is None:
+                                    value = ''
+                                else:
+                                    value = str(value)
+                            except Exception as e:
+                                log_event(DIR_PATH_OUTPUT, f'Erro ao tratar campo "{key}" com valor "{value}": {e}')
+                                ignorar_registro = True
+                                break
+
+                            row.append(value)
+
+                        if not ignorar_registro:
+                            writer.writerow(row)
+                            total_written += 1
+                        else:
+                            ignorar_registro = False
+
+                        if idx % 1000 == 0:
+                            print(f"  Processados {idx} registros deste arquivo...")
+
+                except ValueError as e:
+                    print(f"   ❌ Erro de validação no arquivo {relative_path}: {e}")
+                except json.JSONDecodeError as e:
+                    print(f"   ❌ Erro ao decodificar JSON: {e}")
+                except Exception as e:
+                    print(f"   ❌ Erro ao ler arquivo: {e}")
+
+        if not header_written:
+            print("⚠️ Nenhum dado para converter")
+            if os.path.exists(csv_file_path):
+                mensagem = f"Nenhum dado JSON processado em '{directory_path}'. Utilizando CSV já existente em '{csv_file_path}'."
+                log_event(DIR_PATH_OUTPUT, mensagem)
+                print(f"⚠️ {mensagem}")
+                return True
+            return False
+
+        print(f"\n📊 Total de registros lidos: {total_records}")
+        print(f"✅ CSV criado com sucesso: {csv_file_path}")
+        print(f"   Registros gravados: {total_written}")
+        print(f"   Campos: {len(ordered_keys)}")
         print("\n" + "=" * 60)
         print("✅ CONVERSÃO CONCLUÍDA COM SUCESSO!")
         print("=" * 60)
-    else:
+        return True
+
+    except PermissionError:
+        print(f"❌ Erro: Sem permissão para escrever em {csv_file_path}")
+        return False
+    except IOError as e:
+        print(f"❌ Erro de I/O ao escrever arquivo CSV: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Erro inesperado na conversão para CSV: {e}")
         if os.path.exists(csv_file_path):
-            mensagem = f"Falha na conversão JSON→CSV. Utilizando CSV já existente em '{csv_file_path}'."
+            mensagem = f"Erro na conversão JSON→CSV: {e}. Utilizando CSV já existente em '{csv_file_path}'."
             log_event(DIR_PATH_OUTPUT, mensagem)
             print(f"⚠️ {mensagem}")
             return True
-        print("\n❌ Falha na conversão para CSV")
-
-    return success
+        return False
 
 def add_decision_column(csv_file_path):
     try:
@@ -446,8 +583,10 @@ def download_zip_files():
     failed_count = 0
     found_files = []
 
+    session = Session()
+
     try:
-        response = requests.get(url)
+        response = session.get(url, timeout=30)
         response.raise_for_status()
 
         # Find all zip file links
@@ -465,7 +604,7 @@ def download_zip_files():
                 if not os.path.exists(file_path):
                     try:
                         print(f"Downloading {filename}...")
-                        file_response = requests.get(link)
+                        file_response = session.get(link, timeout=60)
                         file_response.raise_for_status()
 
                         with open(file_path, 'wb') as f:
@@ -521,6 +660,8 @@ def download_zip_files():
             return True
         print(f"Error downloading zip files: {e}")
         return False
+    finally:
+        session.close()
 
 
 def download_json_metadados():
@@ -551,10 +692,12 @@ def download_json_metadados():
 
     json_pattern = re.compile(rf'^{JSON_FILE_DOWNLOAD}{month_pattern}(0[1-9]|[12]\d|3[01])\.json$')
 
+    session = Session()
+
     try:
         print("Conectando ao site do STJ para buscar arquivos JSON...")
         # Fazer requisição para obter a página HTML
-        response = requests.get(url, timeout=30)
+        response = session.get(url, timeout=30)
         response.raise_for_status()
 
         # Buscar TODOS os links na página
@@ -599,7 +742,7 @@ def download_json_metadados():
 
                     try:
                         # Fazer download do arquivo JSON
-                        file_response = requests.get(full_url, timeout=60)
+                        file_response = session.get(full_url, timeout=60)
                         file_response.raise_for_status()
 
                         # Salvar o arquivo JSON
@@ -684,6 +827,8 @@ def download_json_metadados():
             return True
         print(f"❌ Erro inesperado ao baixar arquivos JSON: {e}")
         return False
+    finally:
+        session.close()
 
 def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path, log_dir):
     """
@@ -710,12 +855,15 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
 
             for row in reader:
                 # Verifica se a linha tem a chave 'TIPODOCUMENTO' (normalizada) e se o valor é ACORDAO
-                if 'TIPODOCUMENTO' in row and row['TIPODOCUMENTO'].upper() in LISTA_TIPO_DOCUMENTO:
+                if 'TIPODOCUMENTO' in row and row['TIPODOCUMENTO'].upper() in _LISTA_TIPO_DOC_SET:
                     seq = row.get('SEQDOCUMENTO')
                     if seq:
                         sequences_to_process.append(seq)
 
         print(f"   -> Encontrados {len(sequences_to_process)} documentos do tipo '{LISTA_TIPO_DOCUMENTO[0]}'.")
+
+        txt_index = build_file_index_recursively(search_dir, '.txt')
+        print(f"   -> Índice local de TXT construído com {len(txt_index)} arquivos.")
 
         # Etapa 2, 3 e 4: Buscar, processar e escrever os dados, e registrar falhas.
         with open(output_csv_path, 'w', newline='', encoding='utf-8') as out_file:
@@ -733,7 +881,7 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
                 print(f"   Processando {idx}/{total_to_process}: Buscando {filename_to_find}...")
 
                 try:
-                    txt_filepath = find_file_recursively(search_dir, filename_to_find)
+                    txt_filepath = txt_index.get(filename_to_find)
 
                     if txt_filepath:
                         with open(txt_filepath, 'r', encoding='utf-8') as txt_file:
