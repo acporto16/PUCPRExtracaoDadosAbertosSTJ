@@ -1,12 +1,22 @@
 import os
-from utils import periodo_arquivo, tipo_documento_slug
+from utils import periodo_arquivo, tipo_documento_slug, load_config
 
-YEAR_DOWNLOAD = '2021'
-MONTH_DOWNLOAD = None
-TIME_START_SYSTEM = 3
+# Carrega configurações do arquivo config.json
+_config = load_config('config.json')
+
+YEAR_DOWNLOAD = _config['year_download']
+MONTH_DOWNLOAD = _config['month_download']
+TIME_START_SYSTEM = _config['auto_start_seconds']
 DEFAULT_START_CONFIRMATION = 'S'
-#LISTA_TIPO_DOCUMENTO = ['DECISÃO', 'DECISAO']
-LISTA_TIPO_DOCUMENTO = ['ACÓRDÃO', 'ACORDAO']
+
+# Mapeia o tipo de documento configurado para a lista esperada
+_tipo_doc = _config['tipo_documento'].upper()
+if _tipo_doc == 'DECISAO':
+    LISTA_TIPO_DOCUMENTO = ['DECISÃO', 'DECISAO']
+elif _tipo_doc == 'ACORDAO':
+    LISTA_TIPO_DOCUMENTO = ['ACÓRDÃO', 'ACORDAO']
+else:
+    LISTA_TIPO_DOCUMENTO = ['ACÓRDÃO', 'ACORDAO']  # Valor padrão
 
 TIPO_DOCUMENTO_ARQUIVO = tipo_documento_slug(LISTA_TIPO_DOCUMENTO)
 PERIODO_ARQUIVO = periodo_arquivo(YEAR_DOWNLOAD, MONTH_DOWNLOAD)

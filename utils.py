@@ -1,6 +1,7 @@
 import os
 import re
 import unicodedata
+import json
 from datetime import datetime
 
 
@@ -123,3 +124,39 @@ def periodo_arquivo(year_download, month_download):
     return f"{str(month_download).zfill(2)}{year_download}"
 
 
+def load_config(config_path='config.json'):
+    """
+    Carrega configurações de um arquivo JSON.
+    Se o arquivo não existir, retorna valores padrão.
+    """
+    default_config = {
+        'year_download': '2021',
+        'month_download': None,
+        'tipo_documento': 'ACORDAO',
+        'auto_start_seconds': 3
+    }
+    
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as config_file:
+                loaded_config = json.load(config_file)
+                # Mescla com valores padrão para garantir que todas as chaves existem
+                return {**default_config, **loaded_config}
+        else:
+            return default_config
+    except Exception as e:
+        print(f"⚠️ Erro ao carregar configuração: {e}. Usando valores padrão.")
+        return default_config
+
+
+def save_config(config_data, config_path='config.json'):
+    """
+    Salva configurações em um arquivo JSON.
+    """
+    try:
+        with open(config_path, 'w', encoding='utf-8') as config_file:
+            json.dump(config_data, config_file, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"⚠️ Erro ao salvar configuração: {e}")
+        return False

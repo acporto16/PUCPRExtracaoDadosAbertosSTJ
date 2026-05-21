@@ -1,8 +1,12 @@
-from lib import *
 import time
 import threading
+import os
 from queue import Empty, Queue
 from datetime import datetime, timedelta
+from utils import load_config, save_config
+
+if os.name == 'nt':
+    import msvcrt
 
 '''
     Autor: Alessandro C Porto
@@ -15,7 +19,33 @@ from datetime import datetime, timedelta
 
 
 def input_with_timeout(prompt, timeout_seconds, default_value):
-    """Lê input do usuário com timeout e retorna valor padrão se não houver resposta."""
+    """Lê input com timeout. Em Windows usa msvcrt para não deixar thread bloqueada no stdin."""
+    if os.name == 'nt':
+        print(prompt, end='', flush=True)
+        typed = []
+        end_time = time.time() + timeout_seconds
+
+        while time.time() < end_time:
+            if msvcrt.kbhit():
+                char = msvcrt.getwche()
+
+                if char in ('\r', '\n'):
+                    print()
+                    return ''.join(typed)
+
+                if char == '\b':
+                    if typed:
+                        typed.pop()
+                    continue
+
+                typed.append(char)
+
+            time.sleep(0.05)
+
+        print(f"\n⏳ Sem confirmação em {timeout_seconds} segundos. Iniciando automaticamente...")
+        return default_value
+
+    # Fallback para outros sistemas
     result_queue = Queue(maxsize=1)
 
     def _read_input():
@@ -33,6 +63,56 @@ def input_with_timeout(prompt, timeout_seconds, default_value):
         print(f"\n⏳ Sem confirmação em {timeout_seconds} segundos. Iniciando automaticamente...")
         return default_value
 
+
+def get_user_config():
+    """
+    Exibe menu interativo para o usuário configurar:
+    - Ano para extração (YEAR_DOWNLOAD)
+    - Tipo de documento (LISTA_TIPO_DOCUMENTO)
+    Salva as configurações em config.json
+    """
+    config = load_config('config.json')
+    
+    print("\n" + "=" * 60)
+    print("⚙️  CONFIGURAÇÃO DO SISTEMA")
+    print("=" * 60)
+    
+    # Pergunta sobre o ano
+    print(f"\n📅 Ano para extração (padrão: {config['year_download']}):")
+    print("   Pressione Enter para manter o valor padrão")
+    year_input = input("   Digite o ano (YYYY): ").strip()
+    
+    if year_input:
+        config['year_download'] = year_input
+        print(f"   ✅ Ano configurado: {year_input}")
+    else:
+        print(f"   ✅ Ano mantido: {config['year_download']}")
+    
+    # Pergunta sobre o tipo de documento
+    print(f"\n📄 Tipo de documento (padrão: {config['tipo_documento']}):")
+    print("   1 - DECISÃO")
+    print("   2 - ACÓRDÃO")
+    print("   Pressione Enter para manter o valor padrão")
+    
+    tipo_input = input("   Digite a opção (1 ou 2): ").strip()
+    
+    if tipo_input == '1':
+        config['tipo_documento'] = 'DECISAO'
+        print("   ✅ Tipo configurado: DECISÃO")
+    elif tipo_input == '2':
+        config['tipo_documento'] = 'ACORDAO'
+        print("   ✅ Tipo configurado: ACÓRDÃO")
+    else:
+        print(f"   ✅ Tipo mantido: {config['tipo_documento']}")
+    
+    # Salva as configurações
+    if save_config(config, 'config.json'):
+        print("\n✅ Configurações salvas com sucesso!")
+    
+    print("=" * 60 + "\n")
+    
+    return config
+
 def main():
     # """Função principal para orquestrar os passos de extração e processamento de dados."""
     
@@ -49,6 +129,19 @@ def main():
     if resposta.strip().upper() != 'S':
         print("\nExecução cancelada pelo usuário.")
         return
+    
+    print("\n" + "-" * 60)
+    print("⚙️  Configurando parâmetros de extração...")
+    print("-" * 60)
+    
+    # Agora obtém as configurações do usuário (APÓS confirmação)
+    get_user_config()
+    
+    # Recarrega as constantes com as novas configurações
+    import importlib
+    import const
+    importlib.reload(const)
+    from const import DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS, UNZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT
         
     print("\n" + "-" * 60)
     print("🚀 Iniciando extração de dados...")
@@ -90,6 +183,11 @@ if __name__ == "__main__":
     print(f"⏱️ Início da execução: {start_time_display.strftime('%d/%m/%Y %H:%M:%S')}")
     print("-" * 60)
 
+    # Importar lib e funções
+    from lib import *
+    from const import TIME_START_SYSTEM, DEFAULT_START_CONFIRMATION
+    
+    # Executar main()
     main()
 
     end_time_display = datetime.now()
