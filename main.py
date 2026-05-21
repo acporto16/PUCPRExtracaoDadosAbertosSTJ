@@ -1,6 +1,7 @@
 import time
 import threading
 import os
+import importlib
 from queue import Empty, Queue
 from datetime import datetime, timedelta
 from utils import load_config, save_config
@@ -137,10 +138,11 @@ def main():
     # Agora obtém as configurações do usuário (APÓS confirmação)
     get_user_config()
     
-    # Recarrega as constantes com as novas configurações
-    import importlib
+    # Recarrega as constantes e a biblioteca principal com as novas configurações
     import const
+    import lib
     importlib.reload(const)
+    importlib.reload(lib)
     from const import DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS, UNZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT
         
     print("\n" + "-" * 60)
@@ -148,31 +150,31 @@ def main():
     print("-" * 60)
     
     #01
-    if not download_zip_files():
+    if not lib.download_zip_files():
         print("Falha ao baixar os arquivos zip.")
         return
     print("Arquivos zip baixados com sucesso.")
 
     #02
-    if not download_json_metadados():
+    if not lib.download_json_metadados():
         print("Falha ao baixar os arquivos JSON.")
         return
     print("Arquivos JSON baixados com sucesso.")
 
     #03
-    if not extract_zip_files():
+    if not lib.extract_zip_files():
         print("Falha ao extrair os arquivos zip.")
         return
     print("Arquivos zip extraídos com sucesso.")
 
     #04
-    if not json_directory_to_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS):
+    if not lib.json_directory_to_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS):
         print("Falha ao gerar o CSV de metadados.")
         return
     print("Sucesso! CSV gerado com metadados dos acórdãos e decisões.")
 
     #05
-    if not read_txt_files_and_create_csv(DIR_PATH_OUTPUT_DADOS_METADADOS, UNZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT):
+    if not lib.read_txt_files_and_create_csv(DIR_PATH_OUTPUT_DADOS_METADADOS, UNZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT):
         print("Falha ao gerar o CSV com os dados dos acórdãos.")
         return
     print("Sucesso! CSV gerado com os dados de acórdãos e decisões.")
@@ -183,8 +185,8 @@ if __name__ == "__main__":
     print(f"⏱️ Início da execução: {start_time_display.strftime('%d/%m/%Y %H:%M:%S')}")
     print("-" * 60)
 
-    # Importar lib e funções
-    from lib import *
+    # Importar lib e funções de configuração
+    import lib
     from const import TIME_START_SYSTEM, DEFAULT_START_CONFIRMATION
     
     # Executar main()

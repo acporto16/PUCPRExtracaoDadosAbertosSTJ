@@ -6,6 +6,31 @@ from const import *
 from utils import *
 
 
+def _directory_contains_matching_files(directory_path, matcher):
+    """Verifica se existe ao menos um arquivo compatível no diretório/subdiretórios."""
+    if not os.path.exists(directory_path):
+        return False
+
+    try:
+        for dirpath, _, filenames in os.walk(directory_path):
+            for filename in filenames:
+                if matcher(filename):
+                    return True
+    except Exception:
+        return False
+
+    return False
+
+
+def _safe_remove_file(file_path):
+    """Remove arquivo, ignorando falha e registrando log se necessário."""
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as e:
+        log_event(DIR_PATH_OUTPUT, f"Falha ao remover arquivo temporário/inválido '{file_path}'. Detalhe: {e}")
+
+
 def read_json_file(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8') as json_file:
@@ -256,10 +281,20 @@ def json_directory_to_csv(directory_path, csv_file_path):
     all_data = read_all_json_files_from_directory(directory_path)
 
     if all_data is None:
+        if os.path.exists(csv_file_path):
+            mensagem = f"Falha ao ler arquivos JSON em '{directory_path}'. Utilizando CSV de metadados já existente em '{csv_file_path}'."
+            log_event(DIR_PATH_OUTPUT, mensagem)
+            print(f"⚠️ {mensagem}")
+            return True
         print("❌ Falha ao ler arquivos JSON")
         return False
 
     if not all_data:
+        if os.path.exists(csv_file_path):
+            mensagem = f"Nenhum dado JSON novo para converter em '{directory_path}'. Utilizando CSV já existente em '{csv_file_path}'."
+            log_event(DIR_PATH_OUTPUT, mensagem)
+            print(f"⚠️ {mensagem}")
+            return True
         print("⚠️ Nenhum dado para converter")
         return False
 
@@ -271,6 +306,11 @@ def json_directory_to_csv(directory_path, csv_file_path):
         print("✅ CONVERSÃO CONCLUÍDA COM SUCESSO!")
         print("=" * 60)
     else:
+        if os.path.exists(csv_file_path):
+            mensagem = f"Falha na conversão JSON→CSV. Utilizando CSV já existente em '{csv_file_path}'."
+            log_event(DIR_PATH_OUTPUT, mensagem)
+            print(f"⚠️ {mensagem}")
+            return True
         print("\n❌ Falha na conversão para CSV")
 
     return success
@@ -305,16 +345,78 @@ def extract_zip_files():
     :return: bool
     '''
     try:
-        for filename in os.listdir(ZIP_DIR_PATH):
-            if filename.endswith('.zip'):
-                zip_path = os.path.join(ZIP_DIR_PATH, filename)
-                extract_path = os.path.join(UNZIP_DIR_PATH)
+        if not os.path.exists(ZIP_DIR_PATH):
+            mensagem = f"Diretório de ZIP não encontrado: {ZIP_DIR_PATH}"
+            log_event(DIR_PATH_OUTPUT, mensagem)
+            if _directory_contains_matching_files(UNZIP_DIR_PATH, lambda nome: nome.endswith('.txt')):
+                aviso = f"{mensagem} Utilizando arquivos TXT já extraídos em '{UNZIP_DIR_PATH}'."
+                log_event(DIR_PATH_OUTPUT, aviso)
+                print(f"⚠️ {aviso}")
+                return True
+            print(f"Error extracting zip files: {mensagem}")
+            return False
 
+        ensure_dir_exists(UNZIP_DIR_PATH)
+
+        total_zip = 0
+        extracted_count = 0
+        invalid_count = 0
+        failed_count = 0
+
+        for filename in sorted(os.listdir(ZIP_DIR_PATH)):
+            if not filename.endswith('.zip'):
+                continue
+
+            total_zip += 1
+            zip_path = os.path.join(ZIP_DIR_PATH, filename)
+            extract_path = os.path.join(UNZIP_DIR_PATH)
+
+            try:
                 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                     zip_ref.extractall(extract_path)
+                extracted_count += 1
                 print(f"Extracted {filename}")
-        return True
+            except zipfile.BadZipFile as e:
+                invalid_count += 1
+                mensagem = f"Arquivo ZIP inválido ignorado: '{zip_path}'. Detalhe: {e}"
+                log_event(DIR_PATH_OUTPUT, mensagem)
+                print(f"⚠️ {mensagem}")
+            except Exception as e:
+                failed_count += 1
+                mensagem = f"Erro ao extrair arquivo '{zip_path}'. Detalhe: {e}"
+                log_event(DIR_PATH_OUTPUT, mensagem)
+                print(f"⚠️ {mensagem}")
+
+        if total_zip == 0:
+            mensagem = f"Nenhum arquivo ZIP encontrado em: {ZIP_DIR_PATH}"
+            log_event(DIR_PATH_OUTPUT, mensagem)
+            if _directory_contains_matching_files(UNZIP_DIR_PATH, lambda nome: nome.endswith('.txt')):
+                aviso = f"{mensagem} Utilizando arquivos TXT já extraídos em '{UNZIP_DIR_PATH}'."
+                log_event(DIR_PATH_OUTPUT, aviso)
+                print(f"⚠️ {aviso}")
+                return True
+            print(f"⚠️ {mensagem}")
+            return False
+
+        print("\n📦 Resumo da extração de ZIPs:")
+        print(f"   Total encontrados: {total_zip}")
+        print(f"   Extraídos com sucesso: {extracted_count}")
+        print(f"   Inválidos ignorados: {invalid_count}")
+        print(f"   Falhas de extração: {failed_count}")
+
+        if extracted_count > 0:
+            return True
+
+        if _directory_contains_matching_files(UNZIP_DIR_PATH, lambda nome: nome.endswith('.txt')):
+            aviso = f"Nenhum ZIP novo foi extraído com sucesso. Utilizando arquivos TXT já existentes em '{UNZIP_DIR_PATH}'."
+            log_event(DIR_PATH_OUTPUT, aviso)
+            print(f"⚠️ {aviso}")
+            return True
+
+        return False
     except Exception as e:
+        mensagem = f"Erro geral ao extrair arquivos ZIP: {e}"
+        log_event(DIR_PATH_OUTPUT, mensagem)
         print(f"Error extracting zip files: {e}")
         return False
 
@@ -338,6 +440,11 @@ def download_zip_files():
         print(f"\n🔎 Procurando arquivos zip para todos os meses de {YEAR_DOWNLOAD} (prefixo: {year_month_prefix})")
 
     date_pattern = re.compile(r'(\d{8})')
+    downloaded_count = 0
+    skipped_count = 0
+    invalid_count = 0
+    failed_count = 0
+    found_files = []
 
     try:
         response = requests.get(url)
@@ -353,20 +460,65 @@ def download_zip_files():
             date_match = date_pattern.search(filename)
 
             if date_match and date_match.group(1).startswith(year_month_prefix):
+                found_files.append(filename)
                 file_path = os.path.join(ZIP_DIR_PATH, filename)
                 if not os.path.exists(file_path):
-                    print(f"Downloading {filename}...")
-                    file_response = requests.get(link)
-                    file_response.raise_for_status()
+                    try:
+                        print(f"Downloading {filename}...")
+                        file_response = requests.get(link)
+                        file_response.raise_for_status()
 
-                    with open(file_path, 'wb') as f:
-                        f.write(file_response.content)
-                    print(f"Downloaded {filename}")
+                        with open(file_path, 'wb') as f:
+                            f.write(file_response.content)
+
+                        if zipfile.is_zipfile(file_path):
+                            downloaded_count += 1
+                            print(f"Downloaded {filename}")
+                        else:
+                            invalid_count += 1
+                            mensagem = f"Download ignorado por arquivo inválido/não ZIP: '{file_path}'."
+                            log_event(DIR_PATH_OUTPUT, mensagem)
+                            print(f"⚠️ {mensagem}")
+                            _safe_remove_file(file_path)
+                    except Exception as e:
+                        failed_count += 1
+                        mensagem = f"Falha ao baixar ZIP '{filename}'. Detalhe: {e}"
+                        log_event(DIR_PATH_OUTPUT, mensagem)
+                        print(f"⚠️ {mensagem}")
+                        _safe_remove_file(file_path)
                 else:
+                    skipped_count += 1
                     print(f"File {filename} already exists")
-        return True
+
+        print("\n📦 Resumo do download de ZIPs:")
+        print(f"   Encontrados no portal: {len(found_files)}")
+        print(f"   Baixados com sucesso: {downloaded_count}")
+        print(f"   Já existentes (pulados): {skipped_count}")
+        print(f"   Inválidos descartados: {invalid_count}")
+        print(f"   Falhas de download: {failed_count}")
+
+        if downloaded_count == 0 and skipped_count == 0 and _directory_contains_matching_files(
+            ZIP_DIR_PATH,
+            lambda nome: nome.endswith('.zip') and nome.startswith(year_month_prefix)
+        ):
+            aviso = f"Nenhum ZIP foi baixado nesta rodada, mas há arquivos locais compatíveis em '{ZIP_DIR_PATH}'."
+            log_event(DIR_PATH_OUTPUT, aviso)
+            print(f"⚠️ {aviso}")
+            return True
+
+        return downloaded_count > 0 or skipped_count > 0
 
     except Exception as e:
+        mensagem = f"Erro geral ao baixar arquivos ZIP: {e}"
+        log_event(DIR_PATH_OUTPUT, mensagem)
+        if _directory_contains_matching_files(
+            ZIP_DIR_PATH,
+            lambda nome: nome.endswith('.zip') and nome.startswith(year_month_prefix)
+        ):
+            aviso = f"{mensagem} Utilizando arquivos ZIP já existentes em '{ZIP_DIR_PATH}'."
+            log_event(DIR_PATH_OUTPUT, aviso)
+            print(f"⚠️ {aviso}")
+            return True
         print(f"Error downloading zip files: {e}")
         return False
 
@@ -462,13 +614,18 @@ def download_json_metadados():
                         print(f"   ✅ Salvo em: {file_path}")
                         downloaded_count += 1
 
-                    except json.JSONDecodeError:
-                        print(f"   ❌ Arquivo baixado não é um JSON válido, removendo...")
-                        os.remove(file_path)
-                        return False
+                    except json.JSONDecodeError as e:
+                        mensagem = f"Arquivo JSON inválido ignorado: '{file_path}'. Detalhe: {e}"
+                        log_event(DIR_PATH_OUTPUT, mensagem)
+                        print(f"   ⚠️ {mensagem}")
+                        _safe_remove_file(file_path)
+                        continue
                     except Exception as e:
-                        print(f"   ❌ Erro ao baixar: {e}")
-                        return False
+                        mensagem = f"Erro ao baixar/processar JSON '{filename}'. Detalhe: {e}"
+                        log_event(DIR_PATH_OUTPUT, mensagem)
+                        print(f"   ⚠️ {mensagem}")
+                        _safe_remove_file(file_path)
+                        continue
                 else:
                     print(f"⏭️  {filename} já existe, pulando download")
                     skipped_count += 1
@@ -479,6 +636,7 @@ def download_json_metadados():
         print("=" * 60)
         print(f"✅ Arquivos baixados com sucesso: {downloaded_count}")
         print(f"⏭️  Arquivos já existentes (pulados): {skipped_count}")
+        print(f"⚠️  Arquivos com falha/ignorados: {len(found_files) - downloaded_count - skipped_count}")
         print(f"📁 Total de arquivos metadados {YEAR_DOWNLOAD} encontrados: {len(found_files)}")
         print(f"📂 Diretório de destino: {download_dir}")
 
@@ -495,12 +653,35 @@ def download_json_metadados():
 
         print("=" * 60)
 
+        if downloaded_count == 0 and skipped_count == 0 and _directory_contains_matching_files(
+            download_dir,
+            lambda nome: json_pattern.match(nome) is not None
+        ):
+            aviso = f"Nenhum JSON novo foi aproveitado nesta rodada, mas há arquivos locais compatíveis em '{download_dir}'."
+            log_event(DIR_PATH_OUTPUT, aviso)
+            print(f"⚠️ {aviso}")
+            return True
+
         return downloaded_count > 0 or skipped_count > 0
 
     except requests.RequestException as e:
+        mensagem = f"Erro ao fazer requisição HTTP para JSONs: {e}"
+        log_event(DIR_PATH_OUTPUT, mensagem)
+        if _directory_contains_matching_files(download_dir, lambda nome: json_pattern.match(nome) is not None):
+            aviso = f"{mensagem} Utilizando arquivos JSON já existentes em '{download_dir}'."
+            log_event(DIR_PATH_OUTPUT, aviso)
+            print(f"⚠️ {aviso}")
+            return True
         print(f"❌ Erro ao fazer requisição HTTP: {e}")
         return False
     except Exception as e:
+        mensagem = f"Erro inesperado ao baixar arquivos JSON: {e}"
+        log_event(DIR_PATH_OUTPUT, mensagem)
+        if _directory_contains_matching_files(download_dir, lambda nome: json_pattern.match(nome) is not None):
+            aviso = f"{mensagem} Utilizando arquivos JSON já existentes em '{download_dir}'."
+            log_event(DIR_PATH_OUTPUT, aviso)
+            print(f"⚠️ {aviso}")
+            return True
         print(f"❌ Erro inesperado ao baixar arquivos JSON: {e}")
         return False
 
@@ -513,6 +694,11 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
     # Etapa 1: Percorrer o arquivo de metadados CSV e obter os seqDocumento
     print(f"   1. Lendo arquivo de metadados CSV: {metadata_csv_path}")
     if not os.path.exists(metadata_csv_path):
+        if os.path.exists(output_csv_path):
+            mensagem = f"Arquivo de metadados não encontrado em '{metadata_csv_path}'. Utilizando CSV final já existente em '{output_csv_path}'."
+            log_event(log_dir, mensagem)
+            print(f"⚠️ {mensagem}")
+            return True
         print(f"❌ Erro: Arquivo de metadados não encontrado.")
         return False
 
@@ -538,33 +724,56 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
 
             processed_count = 0
             not_found_count = 0
+            ignored_count = 0
+            error_count = 0
             total_to_process = len(sequences_to_process)
 
             for idx, seq_documento in enumerate(sequences_to_process, 1):
                 filename_to_find = f"{seq_documento}.txt"
                 print(f"   Processando {idx}/{total_to_process}: Buscando {filename_to_find}...")
 
-                txt_filepath = find_file_recursively(search_dir, filename_to_find)
+                try:
+                    txt_filepath = find_file_recursively(search_dir, filename_to_find)
 
-                if txt_filepath:
-                    with open(txt_filepath, 'r', encoding='utf-8') as txt_file:
-                        content = txt_file.read()
-                        processed_data = _process_txt_content(content)
-                        if processed_data:
-                            acordao, ementa, relatorio, voto, decisao = processed_data
-                            writer.writerow([seq_documento, acordao, ementa, relatorio, voto, decisao])
-                            processed_count += 1
-                else:
-                    not_found_count += 1
-                    log_message = f"Arquivo {filename_to_find} não localizado no diretório {search_dir}"
-                    log_event(log_dir, log_message)
+                    if txt_filepath:
+                        with open(txt_filepath, 'r', encoding='utf-8') as txt_file:
+                            content = txt_file.read()
+                            processed_data = _process_txt_content(content)
+                            if processed_data:
+                                acordao, ementa, relatorio, voto, decisao = processed_data
+                                writer.writerow([seq_documento, acordao, ementa, relatorio, voto, decisao])
+                                processed_count += 1
+                            else:
+                                ignored_count += 1
+                                log_event(log_dir, f"Arquivo {filename_to_find} localizado, mas sem estrutura reconhecida para extração.")
+                    else:
+                        not_found_count += 1
+                        log_message = f"Arquivo {filename_to_find} não localizado no diretório {search_dir}"
+                        log_event(log_dir, log_message)
+                except Exception as e:
+                    error_count += 1
+                    log_event(log_dir, f"Erro ao processar arquivo {filename_to_find}. Detalhe: {e}")
+                    print(f"   ⚠️ Erro ao processar {filename_to_find}: {e}")
 
         print("\n✅ Processamento guiado por metadados concluído.")
         print(f"   {processed_count} arquivos TXT processados com sucesso.")
         print(f"   {not_found_count} arquivos TXT não encontrados (verifique o log em {log_dir}).")
+        print(f"   {ignored_count} arquivos TXT ignorados por estrutura não reconhecida.")
+        print(f"   {error_count} arquivos TXT com erro durante o processamento.")
+
+        if processed_count == 0 and os.path.exists(output_csv_path):
+            mensagem = f"Nenhum TXT foi processado com sucesso nesta execução. Mantendo CSV final existente em '{output_csv_path}'."
+            log_event(log_dir, mensagem)
+            print(f"⚠️ {mensagem}")
+
         return True
 
     except Exception as e:
+        if os.path.exists(output_csv_path):
+            mensagem = f"Erro inesperado ao processar o arquivo de metadados: {e}. Utilizando CSV final já existente em '{output_csv_path}'."
+            log_event(log_dir, mensagem)
+            print(f"⚠️ {mensagem}")
+            return True
         print(f"❌ Erro inesperado ao processar o arquivo de metadados: {e}")
         return False
 
