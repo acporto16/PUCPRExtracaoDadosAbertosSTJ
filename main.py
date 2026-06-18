@@ -70,6 +70,7 @@ def get_user_config():
     """
     Exibe menu interativo para o usuário configurar:
     - Ano para extração (YEAR_DOWNLOAD)
+    - Mês para extração (MONTH_DOWNLOAD)
     - Tipo de documento (LISTA_TIPO_DOCUMENTO)
     Salva as configurações em config.json
     """
@@ -89,6 +90,28 @@ def get_user_config():
         print(f"   ✅ Ano configurado: {year_input}")
     else:
         print(f"   ✅ Ano mantido: {config['year_download']}")
+
+    current_month = config.get('month_download')
+    current_month_display = str(current_month).zfill(2) if current_month not in (None, '') else 'todos'
+
+    print(f"\n🗓️  Mês para extração (padrão: {current_month_display}):")
+    print("   Informe um valor entre 1 e 12")
+    print("   Pressione Enter para manter o valor padrão")
+    print("   Digite 0 para processar todos os meses do ano")
+
+    month_input = input("   Digite o mês (MM): ").strip()
+
+    if month_input:
+        if month_input == '0':
+            config['month_download'] = None
+            print("   ✅ Mês configurado: todos os meses")
+        elif month_input.isdigit() and 1 <= int(month_input) <= 12:
+            config['month_download'] = str(int(month_input)).zfill(2)
+            print(f"   ✅ Mês configurado: {config['month_download']}")
+        else:
+            print(f"   ⚠️ Mês inválido. Mantendo valor atual: {current_month_display}")
+    else:
+        print(f"   ✅ Mês mantido: {current_month_display}")
     
     # Pergunta sobre o tipo de documento
     print(f"\n📄 Tipo de documento (padrão: {config['tipo_documento']}):")

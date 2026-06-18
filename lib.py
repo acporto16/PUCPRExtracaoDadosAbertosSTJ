@@ -928,17 +928,26 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
 def _process_txt_content(content):
     """
     Extrai seções de um conteúdo de texto com regras complexas e priorizadas.
-    1. Verifica se o texto inicia com 'DECISÃO'. Se sim, captura todo o conteúdo.
+    1. Verifica se o texto inicia com 'DECISÃO'. Se sim, preenche RELATÓRIO com o trecho
+       entre 'DECISÃO' e 'o relatório.' e mantém o restante em DECISÃO.
     2. Se não, processa como um 'ACÓRDÃO', buscando as demais seções (EMENTA, RELATÓRIO, VOTO).
     """
     # REGRA 2: Verifica se o documento é uma DECISÃO no início.
-    decisao_start_pattern = re.compile(r'^\s*(?:</?br>|\s)*DECISÃO', re.IGNORECASE)
+    decisao_start_pattern = re.compile(r'^\s*(?:</?br>|\s)*DECIS(?:ÃO|AO)\s*(?:</?br>|\s)*', re.IGNORECASE)
     match_decisao = decisao_start_pattern.search(content)
     if match_decisao:
-        # Se for uma DECISÃO, o conteúdo é tudo após a tag.
         start_of_content = match_decisao.end()
         decisao_text = content[start_of_content:].strip()
-        # Retorna apenas o campo decisão preenchido.
+
+        relatorio_end_pattern = re.compile(r'(?:É\s+|E\s+)?O\s+RELAT(?:ÓRIO|ORIO)\.', re.IGNORECASE)
+        match_relatorio_end = relatorio_end_pattern.search(decisao_text)
+
+        if match_relatorio_end:
+            relatorio_text = removeCRLFString(decisao_text[:match_relatorio_end.start()]).strip()
+            decisao_text = removeCRLFString(decisao_text[match_relatorio_end.end():]).strip()
+            return ('', '', relatorio_text, '', decisao_text)
+
+        # Fallback para preservar o conteúdo quando o marcador final do relatório não é encontrado.
         return ('', '', '', '', removeCRLFString(decisao_text))
 
     # Se não for DECISÃO, processa como ACÓRDÃO (REGRA 1)
