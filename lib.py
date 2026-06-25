@@ -10,6 +10,7 @@ from utils import *
 _DATE_FIELDS = frozenset({'DATAPUBLICACAO', 'DATADISTRIBUICAO', 'DATAJULGAMENTO', 'DATARECEBIMENTO'})
 _TEXT_CLEAN_FIELDS = frozenset({'RECURSO', 'TEOR', 'DESCRICAOMONOCRATICA'})
 _LISTA_TIPO_DOC_SET = frozenset(v.upper() for v in LISTA_TIPO_DOCUMENTO)
+_IS_DECISAO_MODE = normalize_tipo_documento(LISTA_TIPO_DOCUMENTO[0]) == 'decisao' if LISTA_TIPO_DOCUMENTO else False
 
 
 def _directory_contains_matching_files(directory_path, matcher):
@@ -1009,10 +1010,10 @@ def _process_txt_content(content):
     1.1 Se o RELATÓRIO permanecer vazio após a regra anterior, usa fallback até 'EMENTA<br>'.
     2. Se não, processa como um 'ACÓRDÃO', buscando as demais seções (EMENTA, RELATÓRIO, VOTO).
     """
-    # REGRA 2: Verifica se o documento inicia com DECISÃO ou DESPACHO.
+    # REGRA 2: aplicada somente quando o tipo configurado é DECISAO.
     decisao_start_pattern = re.compile(r'^\s*(?:</?br>|\s)*(?:DECIS(?:ÃO|AO)|DESPACHO)\s*(?:</?br>|\s)*', re.IGNORECASE)
-    match_decisao = decisao_start_pattern.search(content)
-    if match_decisao:
+    match_decisao = decisao_start_pattern.search(content) if _IS_DECISAO_MODE else None
+    if _IS_DECISAO_MODE and match_decisao:
         start_of_content = match_decisao.end()
         decisao_text = content[start_of_content:].strip()
 
