@@ -44,6 +44,11 @@ Deseja iniciar a execução do processo de extração? (s/n) [auto em 3s]:
    2 - ACÓRDÃO
    Pressione Enter para manter o valor padrão
    Digite a opção (1 ou 2): 
+
+⚖️  Classe processual para filtro (padrão: HC):
+   Exemplo: HC, REsp, AREsp, AgRg
+   Pressione Enter para manter o valor padrão
+   Digite a classe processual: 
 ```
 
 ### 2. Opções de Configuração
@@ -60,6 +65,19 @@ Deseja iniciar a execução do processo de extração? (s/n) [auto em 3s]:
 - **Padrão:** ACÓRDÃO
 - **Como usar:** Digite `1` ou `2`, ou pressione Enter para manter o padrão
 
+#### **Classe Processual (classe_processual)**
+- **O quê:** Define a classe processual usada para filtrar os metadados no momento da extração
+- **Formato:** Texto livre, por exemplo `HC`, `REsp`, `AREsp`, `AgRg`
+- **Regra de comparação:** o sistema remove espaços em branco e converte tudo para maiúsculo antes de comparar
+- **Padrão:** `HC`
+- **Como usar:** Digite a classe desejada ou pressione Enter para manter o padrão
+
+#### **FORCE-DOWNLOAD**
+- **O quê:** Controla se os metadados JSON já existentes devem ser baixados novamente
+- **Valores aceitos:** `S` (força re-download) ou `N` (não re-baixa arquivos existentes)
+- **Padrão:** `N`
+- **Como usar:** Defina no `config.json` (não aparece no menu de configuração)
+
 ### 3. Arquivo de Configuração (config.json)
 
 As configurações são armazenadas em um arquivo chamado `config.json` na raiz do projeto:
@@ -69,12 +87,14 @@ As configurações são armazenadas em um arquivo chamado `config.json` na raiz 
   "year_download": "2021",
   "month_download": null,
   "tipo_documento": "ACORDAO",
+  "classe_processual": "HC",
+  "FORCE-DOWNLOAD": "N",
   "auto_start_seconds": 3
 }
 ```
 
 - **Você pode editar este arquivo manualmente** se preferir configurar valores padrão diferentes
-- **As alterações são salvas automaticamente** quando você usa o menu interativo
+- **As alterações do menu interativo NÃO são salvas** no `config.json`; valem apenas para a execução atual
 - **O arquivo é preservado** entre execuções do programa
 
 ## Exemplos de Uso
@@ -83,22 +103,25 @@ As configurações são armazenadas em um arquivo chamado `config.json` na raiz 
 ```
 Digite o ano (YYYY): [pressione Enter]
 Digite a opção (1 ou 2): [pressione Enter]
+Digite a classe processual: [pressione Enter]
 ```
-Resultado: Usando 2021 e ACÓRDÃO (valores padrão)
+Resultado: Usando 2021, ACÓRDÃO e HC (valores padrão)
 
 ### Exemplo 2: Customizar Tudo
 ```
 Digite o ano (YYYY): 2023
 Digite a opção (1 ou 2): 1
+Digite a classe processual: REsp
 ```
-Resultado: Usando 2023 e DECISÃO
+Resultado: Usando 2023, DECISÃO e REsp
 
 ### Exemplo 3: Apenas Mudar o Tipo de Documento
 ```
 Digite o ano (YYYY): [pressione Enter]
 Digite a opção (1 ou 2): 1
+Digite a classe processual: AREsp
 ```
-Resultado: Usando 2021 (padrão) e DECISÃO
+Resultado: Usando 2021 (padrão), DECISÃO e AREsp
 
 ## Estrutura dos Arquivos
 
@@ -108,6 +131,10 @@ Resultado: Usando 2021 (padrão) e DECISÃO
 | `const.py` | Carrega as configurações de `config.json` | ❌ Não (modificado automaticamente) |
 | `main.py` | Exibe o menu interativo | ❌ Não recomendado |
 | `utils.py` | Funções de gerenciamento de config | ❌ Não modificar |
+
+> Observação: a classe processual é usada apenas como filtro na leitura dos metadados JSON. A estrutura dos CSVs de saída não é alterada por esse filtro.
+> Modo híbrido: os TXT são lidos direto dos ZIPs e somente os arquivos correspondentes aos `SEQDOCUMENTO` filtrados são salvos no diretório local de arquivos.
+> Extração textual: para separação de `RELATORIO` e `DECISAO`, o parser considera início por `DECISÃO` ou `DESPACHO`.
 
 ## Valores Padrão
 
@@ -125,6 +152,9 @@ R: Sim! Você pode editar o arquivo `config.json` diretamente com um editor de t
 
 **P: O que acontece se eu pressionar Enter em ambas as perguntas?**
 R: O sistema mantém os valores definidos em `config.json`, que por padrão são: 2021, ACÓRDÃO.
+
+**P: Onde configuro `FORCE-DOWNLOAD`?**
+R: Diretamente no `config.json`, usando `"FORCE-DOWNLOAD": "S"` ou `"FORCE-DOWNLOAD": "N"`.
 
 **P: Posso resetar as configurações para o padrão?**
 R: Sim! Delete o arquivo `config.json` ou edite-o manualmente com os valores padrão. Na próxima execução, o sistema criará automaticamente um novo `config.json` com os valores padrão.

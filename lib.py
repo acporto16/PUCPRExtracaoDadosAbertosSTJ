@@ -50,15 +50,19 @@ def _check_for_duplicate_keys(ordered_pairs):
     return d
 
 
-    try:
-        with open(file_path, 'r', encoding='utf-8') as json_file:
-            return json.load(json_file)
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        return None
-    except json.JSONDecodeError:
-        print(f"Error: Invalid JSON format in {file_path}")
-        return None
+def _split_processo_fields(processo_value):
+    """Separa PROCESSO em (CLASSE_PROCESSUAL, NUMERO_PROCESSO)."""
+    if processo_value is None:
+        return '', ''
+
+    processo_text = removeCRLFString(str(processo_value)).strip()
+    if not processo_text:
+        return '', ''
+
+    parts = processo_text.split(None, 1)
+    classe = normalize_classe_processual(parts[0]) if parts else ''
+    numero = parts[1].strip() if len(parts) > 1 else ''
+    return classe, numero
 
 def _format_json_data(data, indent=0):
     formatted = ""
@@ -101,6 +105,7 @@ def json_to_csv(data, csv_file_path):
         # Coletar todas as chaves únicas mantendo a ordem do primeiro registro
         ordered_keys = []
         ordered_keys_set = set()
+        original_keys_map = {}
         if data:
             # Preservar ordem das chaves do primeiro registro
             ordered_keys = [normalize_header_key(key) for key in data[0].keys()]
@@ -137,6 +142,11 @@ def json_to_csv(data, csv_file_path):
                 value = get_value_case_insensitive(item, 'tipoDocumento', original_keys_map)
                 #considerar apenas o tipo de documento especificado na constante TIPO_DOCUMENTO
                 if value.upper() not in _LISTA_TIPO_DOC_SET:
+                    continue
+
+                processo_raw = get_value_case_insensitive(item, 'PROCESSO', original_keys_map)
+                classe_processual, numero_processo = _split_processo_fields(processo_raw)
+                if classe_processual != CLASSE_PROCESSUAL_ALVO:
                     continue
 
                 for key in ordered_keys:
@@ -262,10 +272,10 @@ def read_all_json_files_from_directory(directory_path):
                     else:
                         print(f"   ⚠️ Formato não reconhecido (não é lista nem dicionário)")
 
-            except ValueError as e:
-                print(f"   ❌ Erro de validação no arquivo {relative_path}: {e}")
             except json.JSONDecodeError as e:
                 print(f"   ❌ Erro ao decodificar JSON: {e}")
+            except ValueError as e:
+                print(f"   ❌ Erro de validação no arquivo {relative_path}: {e}")
             except Exception as e:
                 print(f"   ❌ Erro ao ler arquivo: {e}")
 
@@ -356,6 +366,7 @@ def json_directory_to_csv(directory_path, csv_file_path):
                         ordered_keys = [normalize_header_key(k) for k in data[0].keys()]
                         ordered_keys_set = set(ordered_keys)
                         original_keys_map = {normalize_header_key(k): k for k in data[0].keys()}
+
                         writer.writerow(ordered_keys)
                         header_written = True
 
@@ -373,6 +384,11 @@ def json_directory_to_csv(directory_path, csv_file_path):
                     for idx, item in enumerate(data, 1):
                         value = get_value_case_insensitive(item, 'tipoDocumento', original_keys_map)
                         if value.upper() not in _LISTA_TIPO_DOC_SET:
+                            continue
+
+                        processo_raw = get_value_case_insensitive(item, 'PROCESSO', original_keys_map)
+                        classe_processual, numero_processo = _split_processo_fields(processo_raw)
+                        if classe_processual != CLASSE_PROCESSUAL_ALVO:
                             continue
 
                         row = []
@@ -412,10 +428,10 @@ def json_directory_to_csv(directory_path, csv_file_path):
                         if idx % 1000 == 0:
                             print(f"  Processados {idx} registros deste arquivo...")
 
-                except ValueError as e:
-                    print(f"   ❌ Erro de validação no arquivo {relative_path}: {e}")
                 except json.JSONDecodeError as e:
                     print(f"   ❌ Erro ao decodificar JSON: {e}")
+                except ValueError as e:
+                    print(f"   ❌ Erro de validação no arquivo {relative_path}: {e}")
                 except Exception as e:
                     print(f"   ❌ Erro ao ler arquivo: {e}")
 
@@ -693,6 +709,10 @@ def download_json_metadados():
     json_pattern = re.compile(rf'^{JSON_FILE_DOWNLOAD}{month_pattern}(0[1-9]|[12]\d|3[01])\.json$')
 
     session = Session()
+    force_download_enabled = FORCE_DOWNLOAD == 'S'
+
+    if force_download_enabled:
+        print("\n⚠️ FORCE-DOWNLOAD=S: arquivos de metadados serão baixados novamente, mesmo se já existirem localmente.")
 
     try:
         print("Conectando ao site do STJ para buscar arquivos JSON...")
@@ -727,7 +747,7 @@ def download_json_metadados():
                 file_path = os.path.join(download_dir, filename)
 
                 # Verificar se o arquivo já existe localmente
-                if not os.path.exists(file_path):
+                if force_download_enabled or not os.path.exists(file_path):
                     print(f"\n📥 Baixando: {filename}")
 
                     # Construir URL completa se o link for relativo
@@ -830,13 +850,16 @@ def download_json_metadados():
     finally:
         session.close()
 
-def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path, log_dir):
+def read_txt_files_and_create_csv(metadata_csv_path, zip_dir_path, output_csv_path, log_dir, txt_output_dir=None):
     """
-    Cria um CSV com detalhes de acórdãos/decisões, usando um CSV de metadados como guia.
+    Cria um CSV com detalhes de acórdãos/decisões lendo apenas os TXT correspondentes
+    aos SEQDOCUMENTO presentes no CSV de metadados filtrado.
+
+    O conteúdo textual é lido diretamente dos ZIPs, sem extrair em massa para disco.
+    Em modo híbrido, salva em disco apenas os TXT que correspondem aos SEQDOCUMENTO filtrados.
     """
     print("\n🔄 Iniciando processamento de TXTs guiado por metadados...")
 
-    # Etapa 1: Percorrer o arquivo de metadados CSV e obter os seqDocumento
     print(f"   1. Lendo arquivo de metadados CSV: {metadata_csv_path}")
     if not os.path.exists(metadata_csv_path):
         if os.path.exists(output_csv_path):
@@ -844,28 +867,43 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
             log_event(log_dir, mensagem)
             print(f"⚠️ {mensagem}")
             return True
-        print(f"❌ Erro: Arquivo de metadados não encontrado.")
+        print("❌ Erro: Arquivo de metadados não encontrado.")
         return False
+
+    if not os.path.exists(zip_dir_path):
+        if os.path.exists(output_csv_path):
+            mensagem = f"Diretório de ZIP não encontrado em '{zip_dir_path}'. Utilizando CSV final já existente em '{output_csv_path}'."
+            log_event(log_dir, mensagem)
+            print(f"⚠️ {mensagem}")
+            return True
+        print(f"❌ Erro: Diretório de ZIP não encontrado: {zip_dir_path}")
+        return False
+
+    if txt_output_dir:
+        ensure_dir_exists(txt_output_dir)
 
     sequences_to_process = []
     try:
         with open(metadata_csv_path, 'r', encoding='utf-8') as meta_file:
-            # Usa DictReader para tratar cada linha como um dicionário
             reader = csv.DictReader(meta_file, delimiter=';')
 
             for row in reader:
-                # Verifica se a linha tem a chave 'TIPODOCUMENTO' (normalizada) e se o valor é ACORDAO
-                if 'TIPODOCUMENTO' in row and row['TIPODOCUMENTO'].upper() in _LISTA_TIPO_DOC_SET:
-                    seq = row.get('SEQDOCUMENTO')
+                if 'SEQDOCUMENTO' in row:
+                    seq = (row.get('SEQDOCUMENTO') or '').strip()
                     if seq:
                         sequences_to_process.append(seq)
 
-        print(f"   -> Encontrados {len(sequences_to_process)} documentos do tipo '{LISTA_TIPO_DOCUMENTO[0]}'.")
+        sequences_remaining = {f"{seq}.txt".lower(): seq for seq in sequences_to_process}
+        print(f"   -> Encontrados {len(sequences_to_process)} documentos do tipo '{LISTA_TIPO_DOCUMENTO[0]}' após filtro por classe.")
 
-        txt_index = build_file_index_recursively(search_dir, '.txt')
-        print(f"   -> Índice local de TXT construído com {len(txt_index)} arquivos.")
+        zip_files = sorted(
+            os.path.join(dirpath, filename)
+            for dirpath, _, filenames in os.walk(zip_dir_path)
+            for filename in filenames
+            if filename.endswith('.zip')
+        )
+        print(f"   -> Encontrados {len(zip_files)} arquivos ZIP para busca de TXT.")
 
-        # Etapa 2, 3 e 4: Buscar, processar e escrever os dados, e registrar falhas.
         with open(output_csv_path, 'w', newline='', encoding='utf-8') as out_file:
             writer = csv.writer(out_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL, lineterminator='\n')
             writer.writerow(['SEQDOCUMENTO', 'ACORDAO', 'EMENTA', 'RELATORIO', 'VOTO', 'DECISAO'])
@@ -874,34 +912,72 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
             not_found_count = 0
             ignored_count = 0
             error_count = 0
-            total_to_process = len(sequences_to_process)
 
-            for idx, seq_documento in enumerate(sequences_to_process, 1):
-                filename_to_find = f"{seq_documento}.txt"
-                print(f"   Processando {idx}/{total_to_process}: Buscando {filename_to_find}...")
+            for zip_path in zip_files:
+                if not sequences_remaining:
+                    break
+
+                relative_zip = os.path.relpath(zip_path, zip_dir_path)
+                print(f"   Procurando TXT no ZIP: {relative_zip}")
 
                 try:
-                    txt_filepath = txt_index.get(filename_to_find)
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        members_by_name = {}
+                        for info in zip_ref.infolist():
+                            if info.is_dir():
+                                continue
+                            base_name = os.path.basename(info.filename).lower()
+                            if base_name in sequences_remaining:
+                                members_by_name[base_name] = info.filename
 
-                    if txt_filepath:
-                        with open(txt_filepath, 'r', encoding='utf-8') as txt_file:
-                            content = txt_file.read()
-                            processed_data = _process_txt_content(content)
-                            if processed_data:
-                                acordao, ementa, relatorio, voto, decisao = processed_data
-                                writer.writerow([seq_documento, acordao, ementa, relatorio, voto, decisao])
-                                processed_count += 1
-                            else:
-                                ignored_count += 1
-                                log_event(log_dir, f"Arquivo {filename_to_find} localizado, mas sem estrutura reconhecida para extração.")
-                    else:
-                        not_found_count += 1
-                        log_message = f"Arquivo {filename_to_find} não localizado no diretório {search_dir}"
-                        log_event(log_dir, log_message)
+                        for base_name, seq_documento in list(sequences_remaining.items()):
+                            member_name = members_by_name.get(base_name)
+                            if not member_name:
+                                continue
+
+                            print(f"   Processando: {base_name}")
+                            try:
+                                with zip_ref.open(member_name) as txt_file:
+                                    content = txt_file.read().decode('utf-8', errors='replace')
+
+                                    # Modo híbrido: persiste apenas os TXT filtrados por metadados/classe
+                                    if txt_output_dir:
+                                        txt_target_path = os.path.join(txt_output_dir, f"{seq_documento}.txt")
+                                        with open(txt_target_path, 'w', encoding='utf-8') as extracted_txt:
+                                            extracted_txt.write(content)
+
+                                    processed_data = _process_txt_content(content)
+                                    if processed_data:
+                                        acordao, ementa, relatorio, voto, decisao = processed_data
+
+                                        if not (relatorio or '').strip():
+                                            log_relatorio_not_found(
+                                                log_dir,
+                                                f"RELATORIO vazio para SEQDOCUMENTO={seq_documento} (arquivo '{member_name}' no ZIP '{relative_zip}')."
+                                            )
+
+                                        writer.writerow([seq_documento, acordao, ementa, relatorio, voto, decisao])
+                                        processed_count += 1
+                                    else:
+                                        ignored_count += 1
+                                        log_event(log_dir, f"Arquivo {member_name} localizado no ZIP '{relative_zip}', mas sem estrutura reconhecida para extração.")
+                            except Exception as e:
+                                error_count += 1
+                                log_event(log_dir, f"Erro ao processar arquivo {member_name} do ZIP '{relative_zip}'. Detalhe: {e}")
+                                print(f"   ⚠️ Erro ao processar {member_name}: {e}")
+
+                            sequences_remaining.pop(base_name, None)
+
+                except zipfile.BadZipFile as e:
+                    error_count += 1
+                    log_event(log_dir, f"Arquivo ZIP inválido ignorado: '{zip_path}'. Detalhe: {e}")
+                    print(f"   ⚠️ ZIP inválido ignorado: {relative_zip}")
                 except Exception as e:
                     error_count += 1
-                    log_event(log_dir, f"Erro ao processar arquivo {filename_to_find}. Detalhe: {e}")
-                    print(f"   ⚠️ Erro ao processar {filename_to_find}: {e}")
+                    log_event(log_dir, f"Erro ao ler ZIP '{zip_path}'. Detalhe: {e}")
+                    print(f"   ⚠️ Erro ao ler ZIP {relative_zip}: {e}")
+
+            not_found_count = len(sequences_remaining)
 
         print("\n✅ Processamento guiado por metadados concluído.")
         print(f"   {processed_count} arquivos TXT processados com sucesso.")
@@ -928,12 +1004,13 @@ def read_txt_files_and_create_csv(metadata_csv_path, search_dir, output_csv_path
 def _process_txt_content(content):
     """
     Extrai seções de um conteúdo de texto com regras complexas e priorizadas.
-    1. Verifica se o texto inicia com 'DECISÃO'. Se sim, preenche RELATÓRIO com o trecho
-       entre 'DECISÃO' e 'o relatório.' e mantém o restante em DECISÃO.
+    1. Verifica se o texto inicia com 'DECISÃO' ou 'DESPACHO'. Se sim, preenche RELATÓRIO
+       com o trecho entre esse início e 'o relatório.' e mantém o restante em DECISÃO.
+    1.1 Se o RELATÓRIO permanecer vazio após a regra anterior, usa fallback até 'EMENTA<br>'.
     2. Se não, processa como um 'ACÓRDÃO', buscando as demais seções (EMENTA, RELATÓRIO, VOTO).
     """
-    # REGRA 2: Verifica se o documento é uma DECISÃO no início.
-    decisao_start_pattern = re.compile(r'^\s*(?:</?br>|\s)*DECIS(?:ÃO|AO)\s*(?:</?br>|\s)*', re.IGNORECASE)
+    # REGRA 2: Verifica se o documento inicia com DECISÃO ou DESPACHO.
+    decisao_start_pattern = re.compile(r'^\s*(?:</?br>|\s)*(?:DECIS(?:ÃO|AO)|DESPACHO)\s*(?:</?br>|\s)*', re.IGNORECASE)
     match_decisao = decisao_start_pattern.search(content)
     if match_decisao:
         start_of_content = match_decisao.end()
@@ -945,6 +1022,23 @@ def _process_txt_content(content):
         if match_relatorio_end:
             relatorio_text = removeCRLFString(decisao_text[:match_relatorio_end.start()]).strip()
             decisao_text = removeCRLFString(decisao_text[match_relatorio_end.end():]).strip()
+            if relatorio_text:
+                return ('', '', relatorio_text, '', decisao_text)
+
+        # Fallback 1: se relatório estiver vazio, separa no marcador EMENTA<br>.
+        ementa_break_pattern = re.compile(r'EMENTA\s*(?:<br/?>|\n)', re.IGNORECASE)
+        match_ementa_break = ementa_break_pattern.search(decisao_text)
+        if match_ementa_break:
+            relatorio_text = removeCRLFString(decisao_text[:match_ementa_break.start()]).strip()
+            decisao_text = removeCRLFString(decisao_text[match_ementa_break.end():]).strip()
+            return ('', '', relatorio_text, '', decisao_text)
+
+        # Fallback 2 solicitado: separa no marcador <br> EMENTA.
+        ementa_after_br_pattern = re.compile(r'(?:<br\s*/?>|\n)\s*EMENTA\b', re.IGNORECASE)
+        match_ementa_after_br = ementa_after_br_pattern.search(decisao_text)
+        if match_ementa_after_br:
+            relatorio_text = removeCRLFString(decisao_text[:match_ementa_after_br.start()]).strip()
+            decisao_text = removeCRLFString(decisao_text[match_ementa_after_br.end():]).strip()
             return ('', '', relatorio_text, '', decisao_text)
 
         # Fallback para preservar o conteúdo quando o marcador final do relatório não é encontrado.
