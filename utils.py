@@ -6,6 +6,18 @@ from datetime import datetime
 from functools import lru_cache
 
 
+_runtime_config_override = {}
+
+
+def set_runtime_config_override(config_data):
+    """Define overrides de configuração válidos apenas para a execução atual."""
+    global _runtime_config_override
+    if isinstance(config_data, dict):
+        _runtime_config_override = dict(config_data)
+    else:
+        _runtime_config_override = {}
+
+
 # Regex compilada para remover quebras de linha, tabs e tags <br> ou <br/>
 CLEANING_PATTERN = re.compile(r'<br/?>|[\r\n\t]')
 
@@ -46,11 +58,21 @@ def build_file_index_recursively(root_dir, suffix_filter=None):
 
 def log_event(log_dir, message):
     """Registra uma mensagem com data e hora em um arquivo de log."""
+    log_event_to_file(log_dir, message, 'file_not_found.log')
+
+
+def log_event_to_file(log_dir, message, file_name):
+    """Registra uma mensagem com data e hora em um arquivo de log específico."""
     ensure_dir_exists(log_dir)
-    log_file_path = os.path.join(log_dir, 'file_not_found.log')
+    log_file_path = os.path.join(log_dir, file_name)
     timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
     with open(log_file_path, 'a', encoding='utf-8') as log_file:
         log_file.write(f"[{timestamp}] - {message}\n")
+
+
+def log_relatorio_not_found(log_dir, message):
+    """Registra ocorrências em que o campo RELATORIO permaneceu vazio."""
+    log_event_to_file(log_dir, message, 'report_not_found.txt')
 
 
 def removeCRLF(field):
@@ -120,6 +142,13 @@ def normalize_tipo_documento(value: str) -> str:
     return unicodedata.normalize('NFD', value).encode('ascii', 'ignore').decode('utf-8').strip().lower()
 
 
+def normalize_classe_processual(value: str) -> str:
+    """Normaliza classe processual removendo espaços e convertendo para maiúsculo."""
+    if not isinstance(value, str):
+        return ''
+    return re.sub(r'\s+', '', value).strip().upper()
+
+
 def tipo_documento_slug(lista_tipo_documento):
     """
     Retorna slug elegante para nome de arquivo:
@@ -155,6 +184,8 @@ def load_config(config_path='config.json'):
         'year_download': '2021',
         'month_download': None,
         'tipo_documento': 'ACORDAO',
+        'classe_processual': 'HC',
+        'FORCE-DOWNLOAD': 'N',
         'auto_start_seconds': 3
     }
     
@@ -162,13 +193,15 @@ def load_config(config_path='config.json'):
         if os.path.exists(config_path):
             with open(config_path, 'r', encoding='utf-8') as config_file:
                 loaded_config = json.load(config_file)
+                if 'force_download' in loaded_config and 'FORCE-DOWNLOAD' not in loaded_config:
+                    loaded_config['FORCE-DOWNLOAD'] = loaded_config.get('force_download')
                 # Mescla com valores padrão para garantir que todas as chaves existem
-                return {**default_config, **loaded_config}
+                return {**default_config, **loaded_config, **_runtime_config_override}
         else:
-            return default_config
+            return {**default_config, **_runtime_config_override}
     except Exception as e:
         print(f"⚠️ Erro ao carregar configuração: {e}. Usando valores padrão.")
-        return default_config
+        return {**default_config, **_runtime_config_override}
 
 
 def save_config(config_data, config_path='config.json'):

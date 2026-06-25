@@ -1,5 +1,5 @@
 import os
-from utils import periodo_arquivo, tipo_documento_slug, load_config
+from utils import periodo_arquivo, tipo_documento_slug, load_config, normalize_classe_processual
 
 # Carrega configurações do arquivo config.json
 _config = load_config('config.json')
@@ -8,6 +8,8 @@ YEAR_DOWNLOAD = _config['year_download']
 MONTH_DOWNLOAD = _config['month_download']
 TIME_START_SYSTEM = _config['auto_start_seconds']
 DEFAULT_START_CONFIRMATION = 'S'
+CLASSE_PROCESSUAL_ALVO = normalize_classe_processual(_config.get('classe_processual', 'HC'))
+FORCE_DOWNLOAD = str(_config.get('FORCE-DOWNLOAD', 'N')).strip().upper()
 
 # Mapeia o tipo de documento configurado para a lista esperada
 _tipo_doc = _config['tipo_documento'].upper()

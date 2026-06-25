@@ -7,7 +7,9 @@ Este projeto tem como objetivo automatizar a extração e o processamento de dad
 - **Download Automatizado:** Captura arquivos ZIP e metadados JSON diretamente do portal de dados abertos do STJ.
 - **Processamento de Dados:** Descompacta arquivos, extrai o conteúdo textual de decisões e acórdãos e consolida as informações.
 - **Estruturação:** Converte metadados e conteúdos processados para o formato CSV, facilitando a análise de dados.
-- **Otimização de Desempenho:** Reutiliza conexão HTTP e indexa os TXT uma única vez para reduzir buscas repetidas em disco.
+- **Filtro por Classe Processual:** Valida o campo `PROCESSO` durante a extração dos metadados, usando a classe informada pelo usuário.
+- **Modo Híbrido para TXT:** Processa diretamente dos ZIPs e salva em disco apenas os TXT correspondentes aos metadados filtrados.
+- **Extração de RELATÓRIO/DECISÃO:** No processamento textual, aceita documentos iniciados por `DECISÃO` ou `DESPACHO` para separação de campos.
 - **✨ NOVO: Configuração Interativa:** Menu intuitivo para configurar parâmetros sem editar código-fonte.
 
 ### Como Utilizar
@@ -17,6 +19,7 @@ Este projeto tem como objetivo automatizar a extração e o processamento de dad
 python main.py
 ```
 O sistema exibirá um menu para você configurar o ano e o tipo de documento. Pressione Enter para usar valores padrão.
+Também é possível informar a **classe processual** que será usada apenas como filtro na extração dos metadados.
 
 **Documentação rápida:** Veja `COMECO_RAPIDO.md` para começar em 30 segundos.
 
@@ -25,7 +28,11 @@ O sistema exibirá um menu para você configurar o ano e o tipo de documento. Pr
 A partir da **version 2.0**, o sistema oferece um **menu interativo** na inicialização:
 - O usuário define o **ano** para extração
 - O usuário escolhe o **tipo de documento** (DECISÃO ou ACÓRDÃO)
-- As configurações são **salvas automaticamente** em `config.json`
+- O usuário informa a **classe processual** de forma livre, por exemplo `HC`, `REsp`, `AREsp` ou outra sigla/texto disponível no metadado
+- As configurações são **aplicadas apenas na execução atual**
+
+> Observação: a classe processual é usada somente para filtragem durante a leitura do JSON de metadados. No modo híbrido, apenas os TXT correspondentes aos `SEQDOCUMENTO` filtrados são salvos em disco.
+> Observação: `FORCE-DOWNLOAD` (`S`/`N`) é lido de `config.json` e não é perguntado no menu interativo.
 
 **Documentação completa:** Consulte `CONFIGURACAO.md` para instruções detalhadas.
 

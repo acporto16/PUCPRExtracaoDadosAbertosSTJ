@@ -5,7 +5,7 @@ import importlib
 from queue import Empty, Queue
 from datetime import datetime, timedelta
 from const import DEFAULT_START_CONFIRMATION, TIME_START_SYSTEM
-from utils import load_config, save_config
+from utils import load_config, set_runtime_config_override
 
 if os.name == 'nt':
     import msvcrt
@@ -70,8 +70,9 @@ def get_user_config():
     """
     Exibe menu interativo para o usuário configurar:
     - Ano para extração (YEAR_DOWNLOAD)
+    - Mês para extração (MONTH_DOWNLOAD)
     - Tipo de documento (LISTA_TIPO_DOCUMENTO)
-    Salva as configurações em config.json
+    Aplica as configurações apenas na execução atual (sem salvar em config.json)
     """
     config = load_config('config.json')
     
@@ -89,6 +90,28 @@ def get_user_config():
         print(f"   ✅ Ano configurado: {year_input}")
     else:
         print(f"   ✅ Ano mantido: {config['year_download']}")
+
+    current_month = config.get('month_download')
+    current_month_display = str(current_month).zfill(2) if current_month not in (None, '') else 'todos'
+
+    print(f"\n🗓️  Mês para extração (padrão: {current_month_display}):")
+    print("   Informe um valor entre 1 e 12")
+    print("   Pressione Enter para manter o valor padrão")
+    print("   Digite 0 para processar todos os meses do ano")
+
+    month_input = input("   Digite o mês (MM): ").strip()
+
+    if month_input:
+        if month_input == '0':
+            config['month_download'] = None
+            print("   ✅ Mês configurado: todos os meses")
+        elif month_input.isdigit() and 1 <= int(month_input) <= 12:
+            config['month_download'] = str(int(month_input)).zfill(2)
+            print(f"   ✅ Mês configurado: {config['month_download']}")
+        else:
+            print(f"   ⚠️ Mês inválido. Mantendo valor atual: {current_month_display}")
+    else:
+        print(f"   ✅ Mês mantido: {current_month_display}")
     
     # Pergunta sobre o tipo de documento
     print(f"\n📄 Tipo de documento (padrão: {config['tipo_documento']}):")
@@ -106,10 +129,29 @@ def get_user_config():
         print("   ✅ Tipo configurado: ACÓRDÃO")
     else:
         print(f"   ✅ Tipo mantido: {config['tipo_documento']}")
+
+    # Classe processual com preenchimento livre
+    classe_atual = str(config.get('classe_processual', 'HC')).strip()
+    print(f"\n⚖️  Classe processual para filtro (padrão: {classe_atual}):")
+    print("   Exemplo: HC, REsp, AREsp, AgRg")
+    print("   Pressione Enter para manter o valor padrão")
+
+    classe_input = input("   Digite a classe processual: ").strip()
+    if classe_input:
+        config['classe_processual'] = classe_input
+        print(f"   ✅ Classe configurada: {classe_input}")
+    else:
+        print(f"   ✅ Classe mantida: {classe_atual}")
+
+    # FORCE-DOWNLOAD é controlado apenas por configuração (sem prompt interativo)
+    force_download_atual = str(config.get('FORCE-DOWNLOAD', 'N')).strip().upper()
+    if force_download_atual not in ('S', 'N'):
+        force_download_atual = 'N'
+    config['FORCE-DOWNLOAD'] = force_download_atual
     
-    # Salva as configurações
-    if save_config(config, 'config.json'):
-        print("\n✅ Configurações salvas com sucesso!")
+    # Aplica as configurações somente em memória para esta execução
+    set_runtime_config_override(config)
+    print("\n✅ Configurações aplicadas para esta execução (sem salvar em config.json).")
     
     print("=" * 60 + "\n")
     
@@ -144,7 +186,7 @@ def main():
     import lib
     importlib.reload(const)
     importlib.reload(lib)
-    from const import DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS, UNZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT
+    from const import DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS, ZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT, UNZIP_DIR_PATH
         
     print("\n" + "-" * 60)
     print("🚀 Iniciando extração de dados...")
@@ -163,22 +205,16 @@ def main():
     print("Arquivos JSON baixados com sucesso.")
 
     #03
-    if not lib.extract_zip_files():
-        print("Falha ao extrair os arquivos zip.")
-        return
-    print("Arquivos zip extraídos com sucesso.")
-
-    #04
     if not lib.json_directory_to_csv(DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS):
         print("Falha ao gerar o CSV de metadados.")
         return
     print("Sucesso! CSV gerado com metadados dos acórdãos e decisões.")
 
-    #05
-    if not lib.read_txt_files_and_create_csv(DIR_PATH_OUTPUT_DADOS_METADADOS, UNZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT):
+    #04
+    if not lib.read_txt_files_and_create_csv(DIR_PATH_OUTPUT_DADOS_METADADOS, ZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT, UNZIP_DIR_PATH):
         print("Falha ao gerar o CSV com os dados dos acórdãos.")
         return
-    print("Sucesso! CSV gerado com os dados de acórdãos e decisões.")
+    print("Sucesso! CSV gerado com os dados de acórdãos e decisões e TXT selecionados salvos localmente.")
 
 if __name__ == "__main__":
     start_time_display = datetime.now()

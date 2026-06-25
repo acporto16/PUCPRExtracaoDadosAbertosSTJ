@@ -1,6 +1,8 @@
 {
-  "year_download": "2020",
-  "month_download": null,
-  "tipo_documento": "ACORDAO",
-  "auto_start_seconds": 3
+  "year_download": "2026",
+  "month_download": "02",
+  "tipo_documento": "DECISAO",
+  "classe_processual": "HC",
+  "FORCE-DOWNLOAD": "N",
+  "auto_start_seconds": 2
 }
