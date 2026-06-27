@@ -5,7 +5,7 @@ import importlib
 from queue import Empty, Queue
 from datetime import datetime, timedelta
 from const import DEFAULT_START_CONFIRMATION, TIME_START_SYSTEM
-from utils import load_config, set_runtime_config_override
+from utils import load_config, set_runtime_config_override, normalize_toggle_flag
 
 if os.name == 'nt':
     import msvcrt
@@ -157,41 +157,19 @@ def get_user_config():
     
     return config
 
-def main():
-    # """Função principal para orquestrar os passos de extração e processamento de dados."""
-    
-    print("=" * 60)
-    print("📥 Olá! Bem-vindo ao Extrator de Dados de Acórdãos e Decisões.")
-    print("=" * 60)
-    
-    resposta = input_with_timeout(
-        f"\nDeseja iniciar a execução do processo de extração? (s/n) [auto em {TIME_START_SYSTEM}s]: ",
-        timeout_seconds=TIME_START_SYSTEM,
-        default_value=DEFAULT_START_CONFIRMATION
-    )
-    
-    if resposta.strip().upper() != 'S':
-        print("\nExecução cancelada pelo usuário.")
-        return
-    
-    print("\n" + "-" * 60)
-    print("⚙️  Configurando parâmetros de extração...")
-    print("-" * 60)
-    
-    # Agora obtém as configurações do usuário (APÓS confirmação)
-    get_user_config()
-    
-    # Recarrega as constantes e a biblioteca principal com as novas configurações
+
+def run_configured_flow():
+    """Executa o fluxo principal usando a configuração já carregada em const/lib."""
     import const
     import lib
     importlib.reload(const)
     importlib.reload(lib)
     from const import DIR_PATH_DOWNLOAD_DADOS_METADADOS, DIR_PATH_OUTPUT_DADOS_METADADOS, ZIP_DIR_PATH, DIR_PATH_OUTPUT_DECISOES_ACORDAOS, DIR_PATH_OUTPUT, UNZIP_DIR_PATH
-        
+
     print("\n" + "-" * 60)
     print("🚀 Iniciando extração de dados...")
     print("-" * 60)
-    
+
     #01
     if not lib.download_zip_files():
         print("Falha ao baixar os arquivos zip.")
@@ -216,14 +194,45 @@ def main():
         return
     print("Sucesso! CSV gerado com os dados de acórdãos e decisões e TXT selecionados salvos localmente.")
 
+def main():
+    # """Função principal para orquestrar os passos de extração e processamento de dados."""
+    
+    print("=" * 60)
+    print("📥 Olá! Bem-vindo ao Extrator de Dados de Acórdãos e Decisões.")
+    print("=" * 60)
+    
+    config = load_config('config.json')
+    auto_loading = normalize_toggle_flag(config.get('AUTO-LOADING', config.get('auto_loading', 'N')))
+
+    if auto_loading == 'S':
+        print("\n⚙️ AUTO-LOADING=S: executando sem prompts, usando apenas config.json.")
+        set_runtime_config_override(config)
+        run_configured_flow()
+        return
+
+    resposta = input_with_timeout(
+        f"\nDeseja iniciar a execução do processo de extração? (s/n) [auto em {TIME_START_SYSTEM}s]: ",
+        timeout_seconds=TIME_START_SYSTEM,
+        default_value=DEFAULT_START_CONFIRMATION
+    )
+
+    if resposta.strip().upper() != 'S':
+        print("\nExecução cancelada pelo usuário.")
+        return
+
+    print("\n" + "-" * 60)
+    print("⚙️  Configurando parâmetros de extração...")
+    print("-" * 60)
+
+    # Agora obtém as configurações do usuário (APÓS confirmação)
+    get_user_config()
+    run_configured_flow()
+
 if __name__ == "__main__":
     start_time_display = datetime.now()
     start_time_perf = time.perf_counter()
     print(f"⏱️ Início da execução: {start_time_display.strftime('%d/%m/%Y %H:%M:%S')}")
     print("-" * 60)
-
-    # Importar lib e funções de configuração
-    import lib
     
     # Executar main()
     main()

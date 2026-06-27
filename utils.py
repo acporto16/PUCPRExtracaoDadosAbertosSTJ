@@ -9,11 +9,53 @@ from functools import lru_cache
 _runtime_config_override = {}
 
 
+def normalize_toggle_flag(value, default='N'):
+    """Normaliza flags S/N. Valores inválidos caem no default."""
+    if value is None:
+        return default
+
+    value_text = str(value).strip().upper()
+    if value_text in ('S', 'N'):
+        return value_text
+    return default
+
+
+def normalize_month_download(value):
+    """Normaliza month_download: vazio/0/inválido/None => None; meses válidos => 'MM'."""
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value.lower() == 'none' or value == '0':
+            return None
+
+    if isinstance(value, bool):
+        return None
+
+    value_text = str(value).strip()
+    if value_text.isdigit():
+        month_int = int(value_text)
+        if month_int == 0:
+            return None
+        if 1 <= month_int <= 12:
+            return str(month_int).zfill(2)
+
+    return None
+
+
 def set_runtime_config_override(config_data):
     """Define overrides de configuração válidos apenas para a execução atual."""
     global _runtime_config_override
     if isinstance(config_data, dict):
-        _runtime_config_override = dict(config_data)
+        normalized_config = dict(config_data)
+        normalized_config['AUTO-LOADING'] = normalize_toggle_flag(
+            normalized_config.get('AUTO-LOADING', normalized_config.get('auto_loading', 'N')),
+            default='N'
+        )
+        if 'month_download' in normalized_config:
+            normalized_config['month_download'] = normalize_month_download(normalized_config.get('month_download'))
+        _runtime_config_override = normalized_config
     else:
         _runtime_config_override = {}
 
@@ -170,6 +212,7 @@ def tipo_documento_slug(lista_tipo_documento):
 
 def periodo_arquivo(year_download, month_download):
     """Monta sufixo temporal para o arquivo: YYYY ou MMYYYY."""
+    month_download = normalize_month_download(month_download)
     if month_download is None:
         return str(year_download)
     return f"{str(month_download).zfill(2)}{year_download}"
@@ -186,6 +229,7 @@ def load_config(config_path='config.json'):
         'tipo_documento': 'ACORDAO',
         'classe_processual': 'HC',
         'FORCE-DOWNLOAD': 'N',
+        'AUTO-LOADING': 'N',
         'auto_start_seconds': 3
     }
     
@@ -195,13 +239,24 @@ def load_config(config_path='config.json'):
                 loaded_config = json.load(config_file)
                 if 'force_download' in loaded_config and 'FORCE-DOWNLOAD' not in loaded_config:
                     loaded_config['FORCE-DOWNLOAD'] = loaded_config.get('force_download')
+                if 'auto_loading' in loaded_config and 'AUTO-LOADING' not in loaded_config:
+                    loaded_config['AUTO-LOADING'] = loaded_config.get('auto_loading')
                 # Mescla com valores padrão para garantir que todas as chaves existem
-                return {**default_config, **loaded_config, **_runtime_config_override}
+                merged_config = {**default_config, **loaded_config, **_runtime_config_override}
+                merged_config['month_download'] = normalize_month_download(merged_config.get('month_download'))
+                merged_config['AUTO-LOADING'] = normalize_toggle_flag(merged_config.get('AUTO-LOADING', 'N'))
+                return merged_config
         else:
-            return {**default_config, **_runtime_config_override}
+            merged_config = {**default_config, **_runtime_config_override}
+            merged_config['month_download'] = normalize_month_download(merged_config.get('month_download'))
+            merged_config['AUTO-LOADING'] = normalize_toggle_flag(merged_config.get('AUTO-LOADING', 'N'))
+            return merged_config
     except Exception as e:
         print(f"⚠️ Erro ao carregar configuração: {e}. Usando valores padrão.")
-        return {**default_config, **_runtime_config_override}
+        merged_config = {**default_config, **_runtime_config_override}
+        merged_config['month_download'] = normalize_month_download(merged_config.get('month_download'))
+        merged_config['AUTO-LOADING'] = normalize_toggle_flag(merged_config.get('AUTO-LOADING', 'N'))
+        return merged_config
 
 
 def save_config(config_data, config_path='config.json'):
@@ -209,8 +264,15 @@ def save_config(config_data, config_path='config.json'):
     Salva configurações em um arquivo JSON.
     """
     try:
+        data_to_save = dict(config_data)
+        if 'month_download' in data_to_save:
+            data_to_save['month_download'] = normalize_month_download(data_to_save.get('month_download'))
+        data_to_save['AUTO-LOADING'] = normalize_toggle_flag(
+            data_to_save.get('AUTO-LOADING', data_to_save.get('auto_loading', 'N')),
+            default='N'
+        )
         with open(config_path, 'w', encoding='utf-8') as config_file:
-            json.dump(config_data, config_file, indent=2, ensure_ascii=False)
+            json.dump(data_to_save, config_file, indent=2, ensure_ascii=False)
         return True
     except Exception as e:
         print(f"⚠️ Erro ao salvar configuração: {e}")
