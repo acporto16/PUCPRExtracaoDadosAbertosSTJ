@@ -8,6 +8,10 @@ from functools import lru_cache
 
 _runtime_config_override = {}
 
+_HEADER_KEY_ALIASES = {
+    'NM_MINISTRO': 'MINISTRO',
+}
+
 
 def normalize_toggle_flag(value, default='N'):
     """Normaliza flags S/N. Valores inválidos caem no default."""
@@ -126,28 +130,116 @@ def removeCRLFString(text):
     """Remove quebras de linha, tabs e tags <br> de uma string."""
     return CLEANING_PATTERN.sub('', text) if text else ''
 
+
+def normalize_output_value(value):
+    """Normaliza valor para saída textual, removendo espaços em branco nas extremidades."""
+    if value is None:
+        return ''
+
+    if isinstance(value, str):
+        return value.strip()
+
+    return str(value).strip()
+
+def _format_datetime_to_br_date(value):
+    """Formata datetime no padrão brasileiro sem hora."""
+    return value.strftime('%d/%m/%Y')
+
+
+def _parse_numeric_date_value(value_text):
+    """Interpreta datas numéricas em formatos comuns do STJ (timestamp e YYYYMMDD)."""
+    if not value_text or not value_text.isdigit():
+        return None
+
+    try:
+        if len(value_text) == 8 and value_text[:4].isdigit():
+            return datetime.strptime(value_text, '%Y%m%d')
+
+        numeric_value = int(value_text)
+
+        if len(value_text) >= 13 or numeric_value > 10000000000:
+            return datetime.utcfromtimestamp(numeric_value / 1000)
+
+        if len(value_text) >= 10:
+            return datetime.utcfromtimestamp(numeric_value)
+    except (ValueError, OSError, OverflowError):
+        return None
+
+    return None
+
+
+def _parse_textual_date_value(value_text):
+    """Interpreta datas textuais nos formatos ISO e brasileiro, com ou sem hora."""
+    if not value_text:
+        return None
+
+    iso_candidate = value_text.replace('Z', '+00:00')
+    try:
+        return datetime.fromisoformat(iso_candidate)
+    except ValueError:
+        pass
+
+    known_formats = (
+        '%Y-%m-%d',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y-%m-%d %H:%M:%S.%f',
+        '%Y-%m-%dT%H:%M:%S',
+        '%Y-%m-%dT%H:%M:%S.%f',
+        '%d/%m/%Y',
+        '%d/%m/%Y %H:%M:%S',
+        '%d/%m/%Y %H:%M',
+    )
+
+    for fmt in known_formats:
+        try:
+            return datetime.strptime(value_text, fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
 def convert_timestamp_to_date(timestamp):
     '''
-    Converte timestamp em formato legível de data
-    :param timestamp: Timestamp em milissegundos ou segundos
-    :return: String formatada de data ou valor original se não for timestamp
+    Normaliza datas em formatos heterogêneos para o padrão brasileiro DD/MM/YYYY.
+
+    Aceita:
+    - timestamp em milissegundos ou segundos (int, float ou string numérica)
+    - YYYYMMDD
+    - YYYY-MM-DD
+    - DD/MM/YYYY
+    - variantes com hora e/ou timezone ISO
+
+    :param timestamp: Valor de data em formato numérico ou textual
+    :return: String formatada em DD/MM/YYYY ou valor original se não for possível interpretar
     '''
     if not timestamp:
         return ''
 
     try:
-        # Tentar converter assumindo milissegundos
-        if isinstance(timestamp, (int, float)):
-            # Se o timestamp for muito grande, provavelmente está em milissegundos
-            if timestamp > 10000000000:
-                timestamp = timestamp / 1000
+        if isinstance(timestamp, datetime):
+            return _format_datetime_to_br_date(timestamp)
 
-            data = datetime.fromtimestamp(timestamp)
-            return data.strftime('%d/%m/%Y %H:%M:%S')
-        else:
-            return str(timestamp)
-    except (ValueError, TypeError, OSError):
-        # Se falhar, retornar como string
+        if isinstance(timestamp, (int, float)) and not isinstance(timestamp, bool):
+            numeric_text = str(int(timestamp)) if isinstance(timestamp, float) and timestamp.is_integer() else str(timestamp)
+            parsed_date = _parse_numeric_date_value(numeric_text.replace('.', ''))
+            if parsed_date:
+                return _format_datetime_to_br_date(parsed_date)
+
+        value_text = str(timestamp).strip()
+        if not value_text:
+            return ''
+
+        parsed_date = _parse_numeric_date_value(value_text)
+        if parsed_date:
+            return _format_datetime_to_br_date(parsed_date)
+
+        parsed_date = _parse_textual_date_value(value_text)
+        if parsed_date:
+            return _format_datetime_to_br_date(parsed_date)
+
+        return value_text
+    except (ValueError, TypeError, OSError, OverflowError):
         return str(timestamp)
 
 @lru_cache(maxsize=2048)
@@ -174,7 +266,7 @@ def normalize_header_key(key: str) -> str:
     # Remove qualquer caractere que não seja letra, número ou underscore
     chave_final = re.sub(r'[^A-Z0-9_]', '', com_underscore)
 
-    return chave_final
+    return _HEADER_KEY_ALIASES.get(chave_final, chave_final)
 
 
 def normalize_tipo_documento(value: str) -> str:

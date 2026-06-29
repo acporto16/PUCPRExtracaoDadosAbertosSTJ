@@ -172,6 +172,8 @@ def json_to_csv(data, csv_file_path):
                             value = ''
                         else:
                             value = str(value)
+
+                        value = normalize_output_value(value)
                     except Exception as e:
                         log_event(DIR_PATH_OUTPUT, f'Erro inesperado ao tratar campo "{key}" com valor "{value}": Detalhe do erro: "{e}".')
                         ignorar_registro = True
@@ -207,20 +209,23 @@ def json_to_csv(data, csv_file_path):
 def get_value_case_insensitive(item, normalized_key, original_keys_map):
     """
     Obtém um valor de um dicionário de forma insensível a maiúsculas/minúsculas,
-    especialmente para a chave 'SEQDOCUMENTO'.
+    incluindo aliases normalizados como NM_MINISTRO -> MINISTRO.
     """
-    # Se o item foi localizado normalmente, encerramos e já devolvemos o valor
     original_key = original_keys_map.get(normalized_key, normalized_key)
-    value =  item.get(original_key, '')
-    if value:
-        return value
+    value = item.get(original_key, '')
+    if value not in ('', None):
+        return value.strip() if isinstance(value, str) else value
 
-    # Para a chave SEQDOCUMENTO, fazemos uma busca case-insensitive
+    for item_key, item_value in item.items():
+        if normalize_header_key(item_key) == normalized_key:
+            return item_value.strip() if isinstance(item_value, str) else item_value
+
     if normalized_key == 'SEQDOCUMENTO':
         for item_key, item_value in item.items():
             if normalize_header_key(item_key) in _LIST_FIELDS_SET:
-                return item_value
-        return ''  # Retorna vazio se nenhuma variação for encontrada
+                return item_value.strip() if isinstance(item_value, str) else item_value
+
+    return ''
 
 def read_all_json_files_from_directory(directory_path):
     """
@@ -413,6 +418,8 @@ def json_directory_to_csv(directory_path, csv_file_path):
                                     value = ''
                                 else:
                                     value = str(value)
+
+                                value = normalize_output_value(value)
                             except Exception as e:
                                 log_event(DIR_PATH_OUTPUT, f'Erro ao tratar campo "{key}" com valor "{value}": {e}')
                                 ignorar_registro = True
@@ -707,7 +714,10 @@ def download_json_metadados():
         month_pattern = "(0[1-9]|1[0-2])"
         print(f"\n🔎 Filtrando downloads de metadados para todos os meses de {YEAR_DOWNLOAD}")
 
-    json_pattern = re.compile(rf'^{JSON_FILE_DOWNLOAD}{month_pattern}(0[1-9]|[12]\d|3[01])\.json$')
+    # Aceita ambos os formatos de metadados disponibilizados pelo portal.
+    json_pattern = re.compile(
+        rf'^metadados(?:Publicacao)?{YEAR_DOWNLOAD}{month_pattern}(0[1-9]|[12]\d|3[01])\.json$'
+    )
 
     session = Session()
     force_download_enabled = FORCE_DOWNLOAD == 'S'
@@ -742,7 +752,8 @@ def download_json_metadados():
             # Extrair apenas o nome do arquivo
             filename = os.path.basename(link)
 
-            # Verificar se o arquivo corresponde ao padrão metadadosYYYYMMDD.json
+            # Verifica se o arquivo corresponde a metadadosYYYYMMDD.json
+            # ou metadadosPublicacaoYYYYMMDD.json.
             if json_pattern.match(filename):
                 found_files.append(filename)
                 file_path = os.path.join(download_dir, filename)
@@ -810,7 +821,10 @@ def download_json_metadados():
                 status = "✅ Baixado" if os.path.exists(os.path.join(download_dir, f)) else "❌ Não baixado"
                 print(f"   • {f} [{status}]")
         else:
-            print(f"\n⚠️ ATENÇÃO: Nenhum arquivo metadados{YEAR_DOWNLOAD}MMDD.json foi encontrado na página!")
+            print(
+                f"\n⚠️ ATENÇÃO: Nenhum arquivo metadados{YEAR_DOWNLOAD}MMDD.json "
+                f"ou metadadosPublicacao{YEAR_DOWNLOAD}MMDD.json foi encontrado na página!"
+            )
             print("   Possíveis causas:")
             print(f"   - Os arquivos ainda não foram disponibilizados para {YEAR_DOWNLOAD}")
             print("   - A URL ou estrutura do site pode ter mudado")
@@ -957,7 +971,14 @@ def read_txt_files_and_create_csv(metadata_csv_path, zip_dir_path, output_csv_pa
                                                 f"RELATORIO vazio para SEQDOCUMENTO={seq_documento} (arquivo '{member_name}' no ZIP '{relative_zip}')."
                                             )
 
-                                        writer.writerow([seq_documento, acordao, ementa, relatorio, voto, decisao])
+                                        writer.writerow([
+                                            normalize_output_value(seq_documento),
+                                            normalize_output_value(acordao),
+                                            normalize_output_value(ementa),
+                                            normalize_output_value(relatorio),
+                                            normalize_output_value(voto),
+                                            normalize_output_value(decisao),
+                                        ])
                                         processed_count += 1
                                     else:
                                         ignored_count += 1
@@ -1010,6 +1031,7 @@ def _process_txt_content(content):
     1.1 Se o RELATÓRIO permanecer vazio após a regra anterior, usa fallback até 'EMENTA<br>'.
     2. Se não, processa como um 'ACÓRDÃO', buscando as demais seções (EMENTA, RELATÓRIO, VOTO).
     """
+
     # REGRA 2: aplicada somente quando o tipo configurado é DECISAO.
     decisao_start_pattern = re.compile(r'^\s*(?:</?br>|\s)*(?:DECIS(?:ÃO|AO)|DESPACHO)\s*(?:</?br>|\s)*', re.IGNORECASE)
     match_decisao = decisao_start_pattern.search(content) if _IS_DECISAO_MODE else None

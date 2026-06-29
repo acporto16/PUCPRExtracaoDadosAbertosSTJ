@@ -3,7 +3,7 @@
   "month_download": "",
   "tipo_documento": "ACORDAO",
   "classe_processual": "HC",
-  "FORCE-DOWNLOAD": "S",
+  "FORCE-DOWNLOAD": "N",
   "AUTO-LOADING": "N",
   "auto_start_seconds": 2
 }
