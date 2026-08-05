@@ -2,6 +2,7 @@ import json
 import csv
 import requests
 import zipfile
+from datetime import datetime
 from requests import Session
 from const import *
 from utils import *
@@ -11,6 +12,37 @@ _DATE_FIELDS = frozenset({'DATAPUBLICACAO', 'DATADISTRIBUICAO', 'DATAJULGAMENTO'
 _TEXT_CLEAN_FIELDS = frozenset({'RECURSO', 'TEOR', 'DESCRICAOMONOCRATICA'})
 _LISTA_TIPO_DOC_SET = frozenset(v.upper() for v in LISTA_TIPO_DOCUMENTO)
 _IS_DECISAO_MODE = normalize_tipo_documento(LISTA_TIPO_DOCUMENTO[0]) == 'decisao' if LISTA_TIPO_DOCUMENTO else False
+_DATARECEBIMENTO_CUTOFF_TEXT = normalize_ano_publicacao_dje(ANO_PUBLICACAO_DJE) or '01/01/2021'
+_DATARECEBIMENTO_CUTOFF_DATE = datetime.strptime(_DATARECEBIMENTO_CUTOFF_TEXT, '%d/%m/%Y').date()
+
+
+def _log_invalid_datarecebimento(item, raw_value, original_keys_map, error_detail, relative_path=None):
+    """Registra no log padrão a falha de conversão de DATARECEBIMENTO com os campos de rastreio."""
+    seq_documento = get_value_case_insensitive(item, 'SEQDOCUMENTO', original_keys_map)
+    numero_registro = get_value_case_insensitive(item, 'NUMEROREGISTRO', original_keys_map)
+    source = relative_path or item.get('_source_file', 'desconhecido')
+    raw_text = normalize_output_value(raw_value)
+    detalhe = (
+        f"Falha ao converter DATARECEBIMENTO no arquivo '{source}'. "
+        f"seqDocumento='{normalize_output_value(seq_documento)}'; "
+        f"numeroRegistro='{normalize_output_value(numero_registro)}'; "
+        f"dataRecebimento='{raw_text}'; "
+        f"erro='{normalize_output_value(error_detail)}'."
+    )
+    log_event(DIR_PATH_OUTPUT, detalhe)
+
+
+def _passes_datarecebimento_cutoff(raw_value):
+    """Retorna (status, erro). status=True/False quando interpretável, None quando inválido."""
+    normalized_date = convert_timestamp_to_date(raw_value)
+    if not normalized_date:
+        return None, 'DATARECEBIMENTO vazio ou ausente'
+
+    try:
+        recebimento_date = datetime.strptime(normalized_date, '%d/%m/%Y').date()
+        return recebimento_date >= _DATARECEBIMENTO_CUTOFF_DATE, None
+    except (ValueError, TypeError):
+        return None, f"não foi possível converter '{normalized_date}' para o formato DD/MM/YYYY"
 
 
 def _directory_contains_matching_files(directory_path, matcher):
@@ -148,6 +180,14 @@ def json_to_csv(data, csv_file_path):
                 processo_raw = get_value_case_insensitive(item, 'PROCESSO', original_keys_map)
                 classe_processual, numero_processo = _split_processo_fields(processo_raw)
                 if classe_processual != CLASSE_PROCESSUAL_ALVO:
+                    continue
+
+                data_recebimento_raw = get_value_case_insensitive(item, 'DATARECEBIMENTO', original_keys_map)
+                data_recebimento_ok, data_recebimento_error = _passes_datarecebimento_cutoff(data_recebimento_raw)
+                if data_recebimento_ok is None:
+                    _log_invalid_datarecebimento(item, data_recebimento_raw, original_keys_map, data_recebimento_error)
+                    continue
+                if not data_recebimento_ok:
                     continue
 
                 for key in ordered_keys:
@@ -395,6 +435,14 @@ def json_directory_to_csv(directory_path, csv_file_path):
                         processo_raw = get_value_case_insensitive(item, 'PROCESSO', original_keys_map)
                         classe_processual, numero_processo = _split_processo_fields(processo_raw)
                         if classe_processual != CLASSE_PROCESSUAL_ALVO:
+                            continue
+
+                        data_recebimento_raw = get_value_case_insensitive(item, 'DATARECEBIMENTO', original_keys_map)
+                        data_recebimento_ok, data_recebimento_error = _passes_datarecebimento_cutoff(data_recebimento_raw)
+                        if data_recebimento_ok is None:
+                            _log_invalid_datarecebimento(item, data_recebimento_raw, original_keys_map, data_recebimento_error, relative_path)
+                            continue
+                        if not data_recebimento_ok:
                             continue
 
                         row = []

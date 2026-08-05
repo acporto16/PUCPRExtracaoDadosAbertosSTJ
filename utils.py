@@ -48,6 +48,22 @@ def normalize_month_download(value):
     return None
 
 
+def normalize_ano_publicacao_dje(value):
+    """Normaliza a data mínima de publicação (DD/MM/YYYY) usada no filtro de extração."""
+    if value is None:
+        return None
+
+    value_text = str(value).strip()
+    if not value_text:
+        return None
+
+    parsed_date = _parse_numeric_date_value(value_text) or _parse_textual_date_value(value_text)
+    if not parsed_date:
+        return value_text
+
+    return _format_datetime_to_br_date(parsed_date)
+
+
 def set_runtime_config_override(config_data):
     """Define overrides de configuração válidos apenas para a execução atual."""
     global _runtime_config_override
@@ -59,6 +75,9 @@ def set_runtime_config_override(config_data):
         )
         if 'month_download' in normalized_config:
             normalized_config['month_download'] = normalize_month_download(normalized_config.get('month_download'))
+        normalized_config['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(
+            normalized_config.get('ANO-PUBLICACAO-DJE', normalized_config.get('ano_publicacao_dje'))
+        )
         _runtime_config_override = normalized_config
     else:
         _runtime_config_override = {}
@@ -288,10 +307,15 @@ def tipo_documento_slug(lista_tipo_documento):
     Retorna slug elegante para nome de arquivo:
     - DECISÃO/DECISAO -> decisoes
     - ACÓRDÃO/ACORDAO -> acordaos
+    - GERAL (ambos) -> geral
     Fallback: normalizado + 's'
     """
     if not lista_tipo_documento:
         return 'documentos'
+
+    # Detecta modo GERAL quando há 4 itens (ambos os tipos com variantes)
+    if len(lista_tipo_documento) >= 4:
+        return 'geral'
 
     base = normalize_tipo_documento(lista_tipo_documento[0])
 
@@ -320,6 +344,7 @@ def load_config(config_path='config.json'):
         'month_download': None,
         'tipo_documento': 'ACORDAO',
         'classe_processual': 'HC',
+        'ANO-PUBLICACAO-DJE': '01/01/2021',
         'FORCE-DOWNLOAD': 'N',
         'AUTO-LOADING': 'N',
         'auto_start_seconds': 3
@@ -333,21 +358,26 @@ def load_config(config_path='config.json'):
                     loaded_config['FORCE-DOWNLOAD'] = loaded_config.get('force_download')
                 if 'auto_loading' in loaded_config and 'AUTO-LOADING' not in loaded_config:
                     loaded_config['AUTO-LOADING'] = loaded_config.get('auto_loading')
+                if 'ano_publicacao_dje' in loaded_config and 'ANO-PUBLICACAO-DJE' not in loaded_config:
+                    loaded_config['ANO-PUBLICACAO-DJE'] = loaded_config.get('ano_publicacao_dje')
                 # Mescla com valores padrão para garantir que todas as chaves existem
                 merged_config = {**default_config, **loaded_config, **_runtime_config_override}
                 merged_config['month_download'] = normalize_month_download(merged_config.get('month_download'))
                 merged_config['AUTO-LOADING'] = normalize_toggle_flag(merged_config.get('AUTO-LOADING', 'N'))
+                merged_config['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(merged_config.get('ANO-PUBLICACAO-DJE', '01/01/2021'))
                 return merged_config
         else:
             merged_config = {**default_config, **_runtime_config_override}
             merged_config['month_download'] = normalize_month_download(merged_config.get('month_download'))
             merged_config['AUTO-LOADING'] = normalize_toggle_flag(merged_config.get('AUTO-LOADING', 'N'))
+            merged_config['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(merged_config.get('ANO-PUBLICACAO-DJE', '01/01/2021'))
             return merged_config
     except Exception as e:
         print(f"⚠️ Erro ao carregar configuração: {e}. Usando valores padrão.")
         merged_config = {**default_config, **_runtime_config_override}
         merged_config['month_download'] = normalize_month_download(merged_config.get('month_download'))
         merged_config['AUTO-LOADING'] = normalize_toggle_flag(merged_config.get('AUTO-LOADING', 'N'))
+        merged_config['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(merged_config.get('ANO-PUBLICACAO-DJE', '01/01/2021'))
         return merged_config
 
 
@@ -359,6 +389,9 @@ def save_config(config_data, config_path='config.json'):
         data_to_save = dict(config_data)
         if 'month_download' in data_to_save:
             data_to_save['month_download'] = normalize_month_download(data_to_save.get('month_download'))
+        data_to_save['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(
+            data_to_save.get('ANO-PUBLICACAO-DJE', data_to_save.get('ano_publicacao_dje'))
+        )
         data_to_save['AUTO-LOADING'] = normalize_toggle_flag(
             data_to_save.get('AUTO-LOADING', data_to_save.get('auto_loading', 'N')),
             default='N'

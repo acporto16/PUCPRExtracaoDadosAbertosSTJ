@@ -10,6 +10,7 @@ TIME_START_SYSTEM = _config['auto_start_seconds']
 DEFAULT_START_CONFIRMATION = 'S'
 CLASSE_PROCESSUAL_ALVO = normalize_classe_processual(_config.get('classe_processual', 'HC'))
 FORCE_DOWNLOAD = str(_config.get('FORCE-DOWNLOAD', 'N')).strip().upper()
+ANO_PUBLICACAO_DJE = _config.get('ANO-PUBLICACAO-DJE', '01/01/2021')
 
 # Mapeia o tipo de documento configurado para a lista esperada
 _tipo_doc = _config['tipo_documento'].upper()
@@ -17,6 +18,8 @@ if _tipo_doc == 'DECISAO':
     LISTA_TIPO_DOCUMENTO = ['DECISÃO', 'DECISAO']
 elif _tipo_doc == 'ACORDAO':
     LISTA_TIPO_DOCUMENTO = ['ACÓRDÃO', 'ACORDAO']
+elif _tipo_doc == 'GERAL':
+    LISTA_TIPO_DOCUMENTO = ['DECISÃO', 'DECISAO', 'ACÓRDÃO', 'ACORDAO']
 else:
     LISTA_TIPO_DOCUMENTO = ['ACÓRDÃO', 'ACORDAO']  # Valor padrão
 

@@ -42,8 +42,9 @@ Deseja iniciar a execução do processo de extração? (s/n) [auto em 3s]:
 📄 Tipo de documento (padrão: ACORDAO):
    1 - DECISÃO
    2 - ACÓRDÃO
+   3 - GERAL (ambos)
    Pressione Enter para manter o valor padrão
-   Digite a opção (1 ou 2): 
+   Digite a opção (1, 2 ou 3): 
 
 ⚖️  Classe processual para filtro (padrão: HC):
    Exemplo: HC, REsp, AREsp, AgRg
@@ -62,8 +63,9 @@ Deseja iniciar a execução do processo de extração? (s/n) [auto em 3s]:
 #### **Tipo de Documento (LISTA_TIPO_DOCUMENTO)**
 - **Opção 1:** DECISÃO - Extrai apenas documentos do tipo "Decisão"
 - **Opção 2:** ACÓRDÃO - Extrai apenas documentos do tipo "Acórdão"
+- **Opção 3:** GERAL - Extrai ambos os tipos (Decisão + Acórdão)
 - **Padrão:** ACÓRDÃO
-- **Como usar:** Digite `1` ou `2`, ou pressione Enter para manter o padrão
+- **Como usar:** Digite `1`, `2` ou `3`, ou pressione Enter para manter o padrão
 
 #### **Classe Processual (classe_processual)**
 - **O quê:** Define a classe processual usada para filtrar os metadados no momento da extração
@@ -78,6 +80,13 @@ Deseja iniciar a execução do processo de extração? (s/n) [auto em 3s]:
 - **Padrão:** `N`
 - **Como usar:** Defina no `config.json` (não aparece no menu de configuração)
 
+#### **ANO-PUBLICACAO-DJE**
+- **O quê:** Define a data mínima de `DATARECEBIMENTO` para extração dos registros
+- **Formato:** `DD/MM/YYYY`
+- **Padrão:** `01/01/2021`
+- **Regra (RN01):** registros com `DATARECEBIMENTO` inferior ao valor configurado não são extraídos
+- **Como usar:** Defina no `config.json` (não aparece no menu de configuração)
+
 ### 3. Arquivo de Configuração (config.json)
 
 As configurações são armazenadas em um arquivo chamado `config.json` na raiz do projeto:
@@ -88,6 +97,7 @@ As configurações são armazenadas em um arquivo chamado `config.json` na raiz 
   "month_download": null,
   "tipo_documento": "ACORDAO",
   "classe_processual": "HC",
+  "ANO-PUBLICACAO-DJE": "01/01/2021",
   "FORCE-DOWNLOAD": "N",
   "auto_start_seconds": 3
 }
@@ -102,7 +112,7 @@ As configurações são armazenadas em um arquivo chamado `config.json` na raiz 
 ### Exemplo 1: Manter Valores Padrão
 ```
 Digite o ano (YYYY): [pressione Enter]
-Digite a opção (1 ou 2): [pressione Enter]
+Digite a opção (1, 2 ou 3): [pressione Enter]
 Digite a classe processual: [pressione Enter]
 ```
 Resultado: Usando 2021, ACÓRDÃO e HC (valores padrão)
@@ -110,15 +120,23 @@ Resultado: Usando 2021, ACÓRDÃO e HC (valores padrão)
 ### Exemplo 2: Customizar Tudo
 ```
 Digite o ano (YYYY): 2023
-Digite a opção (1 ou 2): 1
+Digite a opção (1, 2 ou 3): 1
 Digite a classe processual: REsp
 ```
 Resultado: Usando 2023, DECISÃO e REsp
 
-### Exemplo 3: Apenas Mudar o Tipo de Documento
+### Exemplo 3: Extrair Ambos os Tipos
+```
+Digite o ano (YYYY): 2022
+Digite a opção (1, 2 ou 3): 3
+Digite a classe processual: HC
+```
+Resultado: Usando 2022, GERAL (DECISÃO + ACÓRDÃO) e HC
+
+### Exemplo 4: Apenas Mudar o Tipo de Documento
 ```
 Digite o ano (YYYY): [pressione Enter]
-Digite a opção (1 ou 2): 1
+Digite a opção (1, 2 ou 3): 1
 Digite a classe processual: AREsp
 ```
 Resultado: Usando 2021 (padrão), DECISÃO e AREsp
@@ -133,6 +151,7 @@ Resultado: Usando 2021 (padrão), DECISÃO e AREsp
 | `utils.py` | Funções de gerenciamento de config | ❌ Não modificar |
 
 > Observação: a classe processual é usada apenas como filtro na leitura dos metadados JSON. A estrutura dos CSVs de saída não é alterada por esse filtro.
+> RN01: a extração também aplica filtro por `DATARECEBIMENTO` usando a data mínima configurada em `ANO-PUBLICACAO-DJE`.
 > Modo híbrido: os TXT são lidos direto dos ZIPs e somente os arquivos correspondentes aos `SEQDOCUMENTO` filtrados são salvos no diretório local de arquivos.
 > Extração textual: para separação de `RELATORIO` e `DECISAO`, o parser considera início por `DECISÃO` ou `DESPACHO`.
 

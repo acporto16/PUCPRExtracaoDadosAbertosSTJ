@@ -1,7 +1,10 @@
-# PUCPR - Extrator de Dados Abertos do STJ
+ac# PUCPR - Extrator de Dados Abertos do STJ
 
 ### Propósito
 Este projeto tem como objetivo automatizar a extração e o processamento de dados abertos do Superior Tribunal de Justiça (STJ), visando a criação de um dataset estruturado para fins de pesquisa científica na PUCPR.
+
+### Principais Regras de Negócio
+- **RN01 - Data de Início da Publicação no DJE:** A data de publicação no Diário da Justiça Eletrônico (DJE) iniciou em 2021, como precisamos da primeira resposta -- liminar --, o sistema não pode extrair dados cuja data de recebimento seja anterior a 01/01/2021.
 
 ### Funcionalidades Principais
 - **Download Automatizado:** Captura arquivos ZIP e metadados JSON diretamente do portal de dados abertos do STJ.
@@ -10,7 +13,17 @@ Este projeto tem como objetivo automatizar a extração e o processamento de dad
 - **Filtro por Classe Processual:** Valida o campo `PROCESSO` durante a extração dos metadados, usando a classe informada pelo usuário.
 - **Modo Híbrido para TXT:** Processa diretamente dos ZIPs e salva em disco apenas os TXT correspondentes aos metadados filtrados.
 - **Extração de RELATÓRIO/DECISÃO:** No processamento textual, aceita documentos iniciados por `DECISÃO` ou `DESPACHO` para separação de campos.
+- **Restrição do Período de Extração:** Em atendimento a RN01, o sistema não pode extrair dados cuja data de recebimento seja anterior a 01/01/2021.
 - **✨ NOVO: Configuração Interativa:** Menu intuitivo para configurar parâmetros sem editar código-fonte.
+
+### Formatos de Data Suportados
+O sistema já valida e normaliza múltiplos formatos de data para o padrão `DD/MM/YYYY`.
+
+- **Numéricos:** `YYYYMMDD`, timestamp em segundos e timestamp em milissegundos.
+- **ISO 8601:** `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, `YYYY-MM-DDTHH:MM:SS`, variantes com fração de segundos e timezone (ex.: `Z`, `+00:00`).
+- **Brasileiros:** `DD/MM/YYYY`, `DD/MM/YYYY HH:MM:SS` e `DD/MM/YYYY HH:MM`.
+
+Essa validação é aplicada durante a extração dos metadados (incluindo `DATARECEBIMENTO`) e no parâmetro de corte da RN01 (`ANO-PUBLICACAO-DJE`).
 
 ### Como Utilizar
 
@@ -27,7 +40,7 @@ Também é possível informar a **classe processual** que será usada apenas com
 
 A partir da **version 2.0**, o sistema oferece um **menu interativo** na inicialização:
 - O usuário define o **ano** para extração
-- O usuário escolhe o **tipo de documento** (DECISÃO ou ACÓRDÃO)
+- O usuário escolhe o **tipo de documento** (DECISÃO, ACÓRDÃO ou GERAL para ambos)
 - O usuário informa a **classe processual** de forma livre, por exemplo `HC`, `REsp`, `AREsp` ou outra sigla/texto disponível no metadado
 - As configurações são **aplicadas apenas na execução atual**
 

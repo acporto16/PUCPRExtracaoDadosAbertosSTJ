@@ -117,9 +117,10 @@ def get_user_config():
     print(f"\n📄 Tipo de documento (padrão: {config['tipo_documento']}):")
     print("   1 - DECISÃO")
     print("   2 - ACÓRDÃO")
+    print("   3 - GERAL (ambos)")
     print("   Pressione Enter para manter o valor padrão")
     
-    tipo_input = input("   Digite a opção (1 ou 2): ").strip()
+    tipo_input = input("   Digite a opção (1, 2 ou 3): ").strip()
     
     if tipo_input == '1':
         config['tipo_documento'] = 'DECISAO'
@@ -127,6 +128,9 @@ def get_user_config():
     elif tipo_input == '2':
         config['tipo_documento'] = 'ACORDAO'
         print("   ✅ Tipo configurado: ACÓRDÃO")
+    elif tipo_input == '3':
+        config['tipo_documento'] = 'GERAL'
+        print("   ✅ Tipo configurado: GERAL (DECISÃO + ACÓRDÃO)")
     else:
         print(f"   ✅ Tipo mantido: {config['tipo_documento']}")
 
