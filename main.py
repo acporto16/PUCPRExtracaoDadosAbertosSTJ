@@ -2,6 +2,7 @@ import time
 import threading
 import os
 import importlib
+import sys
 from queue import Empty, Queue
 from datetime import datetime, timedelta
 from const import DEFAULT_START_CONFIRMATION, TIME_START_SYSTEM
@@ -18,6 +19,17 @@ if os.name == 'nt':
     podem vir em padrões diferentes a depender do período, portanto, ajustes serão necessários durante a extração dos
     dados.
 '''
+
+
+def configure_console_encoding():
+    """Configura saída UTF-8 para evitar erro de encode em consoles Windows cp1252."""
+    if os.name != 'nt':
+        return
+
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 
 def input_with_timeout(prompt, timeout_seconds, default_value):
@@ -233,6 +245,7 @@ def main():
     run_configured_flow()
 
 if __name__ == "__main__":
+    configure_console_encoding()
     start_time_display = datetime.now()
     start_time_perf = time.perf_counter()
     print(f"⏱️ Início da execução: {start_time_display.strftime('%d/%m/%Y %H:%M:%S')}")
