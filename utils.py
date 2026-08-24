@@ -24,6 +24,17 @@ def normalize_toggle_flag(value, default='N'):
     return default
 
 
+def normalize_regra_predicao(value, default='TEMPO'):
+    """Normaliza a regra de predição usada pela extração."""
+    if value is None:
+        return default
+
+    value_text = str(value).strip().upper()
+    if value_text in ('TEMPO', 'JULGAMENTO'):
+        return value_text
+    return default
+
+
 def normalize_month_download(value):
     """Normaliza month_download: vazio/0/inválido/None => None; meses válidos => 'MM'."""
     if value is None:
@@ -77,6 +88,9 @@ def set_runtime_config_override(config_data):
             normalized_config['month_download'] = normalize_month_download(normalized_config.get('month_download'))
         normalized_config['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(
             normalized_config.get('ANO-PUBLICACAO-DJE', normalized_config.get('ano_publicacao_dje'))
+        )
+        normalized_config['REGRA-PREDICAO'] = normalize_regra_predicao(
+            normalized_config.get('REGRA-PREDICAO', normalized_config.get('regra_predicao'))
         )
         _runtime_config_override = normalized_config
     else:
@@ -345,6 +359,7 @@ def load_config(config_path='config.json'):
         'tipo_documento': 'ACORDAO',
         'classe_processual': 'HC',
         'ANO-PUBLICACAO-DJE': '01/01/2021',
+        'REGRA-PREDICAO': 'TEMPO',
         'FORCE-DOWNLOAD': 'N',
         'AUTO-LOADING': 'N',
         'auto_start_seconds': 3
@@ -360,17 +375,21 @@ def load_config(config_path='config.json'):
                     loaded_config['AUTO-LOADING'] = loaded_config.get('auto_loading')
                 if 'ano_publicacao_dje' in loaded_config and 'ANO-PUBLICACAO-DJE' not in loaded_config:
                     loaded_config['ANO-PUBLICACAO-DJE'] = loaded_config.get('ano_publicacao_dje')
+                if 'regra_predicao' in loaded_config and 'REGRA-PREDICAO' not in loaded_config:
+                    loaded_config['REGRA-PREDICAO'] = loaded_config.get('regra_predicao')
                 # Mescla com valores padrão para garantir que todas as chaves existem
                 merged_config = {**default_config, **loaded_config, **_runtime_config_override}
                 merged_config['month_download'] = normalize_month_download(merged_config.get('month_download'))
                 merged_config['AUTO-LOADING'] = normalize_toggle_flag(merged_config.get('AUTO-LOADING', 'N'))
                 merged_config['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(merged_config.get('ANO-PUBLICACAO-DJE', '01/01/2021'))
+                merged_config['REGRA-PREDICAO'] = normalize_regra_predicao(merged_config.get('REGRA-PREDICAO', 'TEMPO'))
                 return merged_config
         else:
             merged_config = {**default_config, **_runtime_config_override}
             merged_config['month_download'] = normalize_month_download(merged_config.get('month_download'))
             merged_config['AUTO-LOADING'] = normalize_toggle_flag(merged_config.get('AUTO-LOADING', 'N'))
             merged_config['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(merged_config.get('ANO-PUBLICACAO-DJE', '01/01/2021'))
+            merged_config['REGRA-PREDICAO'] = normalize_regra_predicao(merged_config.get('REGRA-PREDICAO', 'TEMPO'))
             return merged_config
     except Exception as e:
         print(f"⚠️ Erro ao carregar configuração: {e}. Usando valores padrão.")
@@ -378,6 +397,7 @@ def load_config(config_path='config.json'):
         merged_config['month_download'] = normalize_month_download(merged_config.get('month_download'))
         merged_config['AUTO-LOADING'] = normalize_toggle_flag(merged_config.get('AUTO-LOADING', 'N'))
         merged_config['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(merged_config.get('ANO-PUBLICACAO-DJE', '01/01/2021'))
+        merged_config['REGRA-PREDICAO'] = normalize_regra_predicao(merged_config.get('REGRA-PREDICAO', 'TEMPO'))
         return merged_config
 
 
@@ -391,6 +411,9 @@ def save_config(config_data, config_path='config.json'):
             data_to_save['month_download'] = normalize_month_download(data_to_save.get('month_download'))
         data_to_save['ANO-PUBLICACAO-DJE'] = normalize_ano_publicacao_dje(
             data_to_save.get('ANO-PUBLICACAO-DJE', data_to_save.get('ano_publicacao_dje'))
+        )
+        data_to_save['REGRA-PREDICAO'] = normalize_regra_predicao(
+            data_to_save.get('REGRA-PREDICAO', data_to_save.get('regra_predicao'))
         )
         data_to_save['AUTO-LOADING'] = normalize_toggle_flag(
             data_to_save.get('AUTO-LOADING', data_to_save.get('auto_loading', 'N')),

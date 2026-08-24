@@ -4,7 +4,8 @@ ac# PUCPR - Extrator de Dados Abertos do STJ
 Este projeto tem como objetivo automatizar a extração e o processamento de dados abertos do Superior Tribunal de Justiça (STJ), visando a criação de um dataset estruturado para fins de pesquisa científica na PUCPR.
 
 ### Principais Regras de Negócio
-- **RN01 - Data de Início da Publicação no DJE:** A data de publicação no Diário da Justiça Eletrônico (DJE) iniciou em 2021, como precisamos da primeira resposta -- liminar --, o sistema não pode extrair dados cuja data de recebimento seja anterior a 01/01/2021.
+- **RN01 - Predição do Tempo:** A extração considera a data mínima de `DATARECEBIMENTO` informada em `ANO-PUBLICACAO-DJE` para montar a base da predição do tempo.
+- **RN02 - Predição do Julgamento:** A extração considera a decisão mais recente e não aplica restrição pela data de publicação no DJE.
 
 ### Funcionalidades Principais
 - **Download Automatizado:** Captura arquivos ZIP e metadados JSON diretamente do portal de dados abertos do STJ.
@@ -13,7 +14,7 @@ Este projeto tem como objetivo automatizar a extração e o processamento de dad
 - **Filtro por Classe Processual:** Valida o campo `PROCESSO` durante a extração dos metadados, usando a classe informada pelo usuário.
 - **Modo Híbrido para TXT:** Processa diretamente dos ZIPs e salva em disco apenas os TXT correspondentes aos metadados filtrados.
 - **Extração de RELATÓRIO/DECISÃO:** No processamento textual, aceita documentos iniciados por `DECISÃO` ou `DESPACHO` para separação de campos.
-- **Restrição do Período de Extração:** Em atendimento a RN01, o sistema não pode extrair dados cuja data de recebimento seja anterior a 01/01/2021.
+- **Restrição do Período de Extração:** Em atendimento à RN01, o sistema pode restringir `DATARECEBIMENTO` conforme a data configurada em `ANO-PUBLICACAO-DJE`.
 - **✨ NOVO: Configuração Interativa:** Menu intuitivo para configurar parâmetros sem editar código-fonte.
 
 ### Formatos de Data Suportados
@@ -23,7 +24,7 @@ O sistema já valida e normaliza múltiplos formatos de data para o padrão `DD/
 - **ISO 8601:** `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, `YYYY-MM-DDTHH:MM:SS`, variantes com fração de segundos e timezone (ex.: `Z`, `+00:00`).
 - **Brasileiros:** `DD/MM/YYYY`, `DD/MM/YYYY HH:MM:SS` e `DD/MM/YYYY HH:MM`.
 
-Essa validação é aplicada durante a extração dos metadados (incluindo `DATARECEBIMENTO`) e no parâmetro de corte da RN01 (`ANO-PUBLICACAO-DJE`).
+Essa validação é aplicada durante a extração dos metadados (incluindo `DATARECEBIMENTO`) e no parâmetro de corte da RN01 (`ANO-PUBLICACAO-DJE`), quando `REGRA-PREDICAO = TEMPO`.
 
 ### Como Utilizar
 
@@ -46,6 +47,7 @@ A partir da **version 2.0**, o sistema oferece um **menu interativo** na inicial
 
 > Observação: a classe processual é usada somente para filtragem durante a leitura do JSON de metadados. No modo híbrido, apenas os TXT correspondentes aos `SEQDOCUMENTO` filtrados são salvos em disco.
 > Observação: `FORCE-DOWNLOAD` (`S`/`N`) é lido de `config.json` e não é perguntado no menu interativo.
+> Observação: `REGRA-PREDICAO` controla o comportamento da base: use `TEMPO` para aplicar o corte por `ANO-PUBLICACAO-DJE` e `JULGAMENTO` para considerar a decisão mais recente sem restrição de DJE.
 
 **Documentação completa:** Consulte `CONFIGURACAO.md` para instruções detalhadas.
 

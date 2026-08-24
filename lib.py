@@ -12,8 +12,12 @@ _DATE_FIELDS = frozenset({'DATAPUBLICACAO', 'DATADISTRIBUICAO', 'DATAJULGAMENTO'
 _TEXT_CLEAN_FIELDS = frozenset({'RECURSO', 'TEOR', 'DESCRICAOMONOCRATICA'})
 _LISTA_TIPO_DOC_SET = frozenset(v.upper() for v in LISTA_TIPO_DOCUMENTO)
 _IS_DECISAO_MODE = normalize_tipo_documento(LISTA_TIPO_DOCUMENTO[0]) == 'decisao' if LISTA_TIPO_DOCUMENTO else False
-_DATARECEBIMENTO_CUTOFF_TEXT = normalize_ano_publicacao_dje(ANO_PUBLICACAO_DJE) or '01/01/2021'
-_DATARECEBIMENTO_CUTOFF_DATE = datetime.strptime(_DATARECEBIMENTO_CUTOFF_TEXT, '%d/%m/%Y').date()
+if APLICAR_RESTRICAO_DATARECEBIMENTO:
+    _DATARECEBIMENTO_CUTOFF_TEXT = normalize_ano_publicacao_dje(ANO_PUBLICACAO_DJE) or '01/01/2021'
+    _DATARECEBIMENTO_CUTOFF_DATE = datetime.strptime(_DATARECEBIMENTO_CUTOFF_TEXT, '%d/%m/%Y').date()
+else:
+    _DATARECEBIMENTO_CUTOFF_TEXT = None
+    _DATARECEBIMENTO_CUTOFF_DATE = None
 
 
 def _log_invalid_datarecebimento(item, raw_value, original_keys_map, error_detail, relative_path=None):
@@ -34,6 +38,9 @@ def _log_invalid_datarecebimento(item, raw_value, original_keys_map, error_detai
 
 def _passes_datarecebimento_cutoff(raw_value):
     """Retorna (status, erro). status=True/False quando interpretável, None quando inválido."""
+    if not APLICAR_RESTRICAO_DATARECEBIMENTO:
+        return True, None
+
     normalized_date = convert_timestamp_to_date(raw_value)
     if not normalized_date:
         return None, 'DATARECEBIMENTO vazio ou ausente'
