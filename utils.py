@@ -30,9 +30,12 @@ def normalize_regra_predicao(value, default='TEMPO'):
         return default
 
     value_text = str(value).strip().upper()
-    if value_text in ('TEMPO', 'JULGAMENTO'):
-        return value_text
-    return default
+    return value_text
+
+
+def is_regra_predicao_valida(value):
+    """Valida se a regra de predição está entre os valores suportados."""
+    return str(value).strip().upper() in ('TEMPO', 'DECISAO')
 
 
 def normalize_month_download(value):

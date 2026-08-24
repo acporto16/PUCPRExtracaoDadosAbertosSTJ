@@ -1,5 +1,12 @@
 import os
-from utils import periodo_arquivo, tipo_documento_slug, load_config, normalize_classe_processual, normalize_regra_predicao
+from utils import (
+    periodo_arquivo,
+    tipo_documento_slug,
+    load_config,
+    normalize_classe_processual,
+    normalize_regra_predicao,
+    is_regra_predicao_valida,
+)
 
 # Carrega configurações do arquivo config.json
 _config = load_config('config.json')
@@ -12,6 +19,9 @@ CLASSE_PROCESSUAL_ALVO = normalize_classe_processual(_config.get('classe_process
 FORCE_DOWNLOAD = str(_config.get('FORCE-DOWNLOAD', 'N')).strip().upper()
 ANO_PUBLICACAO_DJE = _config.get('ANO-PUBLICACAO-DJE', '01/01/2021')
 REGRA_PREDICAO = normalize_regra_predicao(_config.get('REGRA-PREDICAO', 'TEMPO'))
+if not is_regra_predicao_valida(REGRA_PREDICAO):
+    raise SystemExit("❌ Valor inválido para REGRA-PREDICAO no config.json. Use apenas 'TEMPO' ou 'DECISAO'.")
+
 APLICAR_RESTRICAO_DATARECEBIMENTO = REGRA_PREDICAO == 'TEMPO'
 
 # Mapeia o tipo de documento configurado para a lista esperada

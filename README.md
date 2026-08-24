@@ -47,7 +47,7 @@ A partir da **version 2.0**, o sistema oferece um **menu interativo** na inicial
 
 > Observação: a classe processual é usada somente para filtragem durante a leitura do JSON de metadados. No modo híbrido, apenas os TXT correspondentes aos `SEQDOCUMENTO` filtrados são salvos em disco.
 > Observação: `FORCE-DOWNLOAD` (`S`/`N`) é lido de `config.json` e não é perguntado no menu interativo.
-> Observação: `REGRA-PREDICAO` controla o comportamento da base: use `TEMPO` para aplicar o corte por `ANO-PUBLICACAO-DJE` e `JULGAMENTO` para considerar a decisão mais recente sem restrição de DJE.
+> Observação: `REGRA-PREDICAO` controla o comportamento da base: use `TEMPO` para aplicar o corte por `ANO-PUBLICACAO-DJE` e `DECISAO` para considerar a decisão mais recente sem restrição de DJE.
 
 **Documentação completa:** Consulte `CONFIGURACAO.md` para instruções detalhadas.
 
