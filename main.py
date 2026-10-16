@@ -13,7 +13,7 @@ if os.name == 'nt':
 
 '''
     Autor: Alessandro C Porto
-    Objeto: Extrair dados para montar dataset para pesquisa científica da PUCPR.
+    Objeto: Extrair dados para montar dataset para pesquisa científica da UNIV.
 
     Sugere-se executar os programa por etapas e observando a captura dos dados. No site dos dados abertos, alguns dados
     podem vir em padrões diferentes a depender do período, portanto, ajustes serão necessários durante a extração dos

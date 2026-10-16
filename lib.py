@@ -750,7 +750,7 @@ def download_json_metadados():
     Regras aplicadas:
     1) Obtém somente arquivos no formato metadadosYYYYMMDD.json
     2) Restringe apenas aos arquivos de YYYY (metadadosYYYYMMDD.json)
-    3) Salva os arquivos no diretório: C:\\_PUCPR\\PrjDadosAbertos\\arquivos
+    3) Salva os arquivos no diretório definido em DIR_PATH_DOWNLOAD_DADOS_METADADOS (const.py)
 
     :return: bool - True se o download foi bem-sucedido, False caso contrário
     '''
